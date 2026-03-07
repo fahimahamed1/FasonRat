@@ -1,7 +1,7 @@
 # Fason
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-2.2.1-purple?style=flat-square" alt="Version 2.2.2">
+  <img src="https://img.shields.io/badge/Version-2.2.2-purple?style=flat-square" alt="Version 2.2.2">
   <img src="https://img.shields.io/badge/Android-14+-green?style=flat-square&logo=android" alt="Android 14+">
   <img src="https://img.shields.io/badge/Node.js-18+-339933?style=flat-square&logo=node.js" alt="Node.js 18+">
   <img src="https://img.shields.io/badge/Java-17-orange?style=flat-square&logo=openjdk" alt="Java 17">
