@@ -1,4 +1,12 @@
 const path = require('path');
+const fs = require('fs');
+
+// Ensure required directories exist
+function ensureDir(dir) {
+    if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+    }
+}
 
 module.exports = {
     // Server config
@@ -9,6 +17,15 @@ module.exports = {
     dbPath: path.join(__dirname, '../database'),
     downloadsPath: path.join(__dirname, '../database/client_downloads'),
     photosPath: path.join(__dirname, '../database/client_photos'),
+    
+    // Initialize directories on startup
+    init() {
+        ensureDir(this.dbPath);
+        ensureDir(this.downloadsPath);
+        ensureDir(this.photosPath);
+        ensureDir(path.join(this.dbPath, 'clients'));
+        ensureDir(path.join(this.dbPath, 'built_apks'));
+    },
     
     // Message keys (matching Android app)
     msg: {

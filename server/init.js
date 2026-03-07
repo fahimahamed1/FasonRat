@@ -19,6 +19,9 @@ console.log(`
 
 logger.info('Server starting...', 'system');
 
+// Initialize directories
+config.init();
+
 // Create Express app
 const app = express();
 const server = http.createServer(app);

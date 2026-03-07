@@ -107,6 +107,17 @@ class TaskManager {
 // Create singleton instance
 const taskManager = new TaskManager();
 
+// Utility for formatting bytes (defined before use)
+const utils = {
+    formatBytes(bytes) {
+        if (!bytes) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+};
+
 // Register cleanup task - removes stale client data
 taskManager.register('cleanup', 3600000, async () => {
     logger.info('Running cleanup task...', 'system');
@@ -187,16 +198,5 @@ taskManager.register('dbMaintenance', 3600000, async () => {
     const stats = db.getStats();
     logger.info(`DB maintenance: ${stats.clientCount} clients, ${utils.formatBytes(stats.totalSize)}`, 'system');
 });
-
-// Utility for formatting bytes
-const utils = {
-    formatBytes(bytes) {
-        if (!bytes) return '0 B';
-        const k = 1024;
-        const sizes = ['B', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-    }
-};
 
 module.exports = taskManager;

@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fason - Error</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="login-page">
+    <div class="login-box">
+        <div class="logo">
+            <div class="fs-icon">FS</div>
+            <h1>Fason</h1>
+        </div>
+        
+        <div class="alert error">
+            <strong>Error</strong>
+            <p><%= error || 'An unexpected error occurred' %></p>
+        </div>
+        
+        <a href="/" class="btn primary full">Return to Dashboard</a>
+        <a href="/login" class="btn full" style="margin-top: 10px;">Back to Login</a>
+    </div>
+</body>
+</html>

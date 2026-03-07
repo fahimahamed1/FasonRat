@@ -89,6 +89,8 @@ router.post('/login', express.urlencoded({ extended: true }), (req, res) => {
             logger.loginSuccess(ip);
             res.cookie('token', token, { 
                 httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'strict',
                 maxAge: 24 * 60 * 60 * 1000 // 24 hours
             }).redirect('/');
         } else {
