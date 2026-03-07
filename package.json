@@ -1,6 +1,6 @@
 {
   "name": "fason",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "description": "Fason - Modern Android Remote Management Suite",
   "main": "index.js",
   "scripts": {

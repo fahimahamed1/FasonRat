@@ -1,9 +1,11 @@
 package com.fason.app.features.contacts;
 
+import android.Manifest;
 import android.database.Cursor;
 import android.provider.ContactsContract.CommonDataKinds.Phone;
 
 import com.fason.app.core.FasonApp;
+import com.fason.app.core.permissions.PermissionManager;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -15,6 +17,14 @@ public class ContactsManager {
         JSONArray list = new JSONArray();
 
         try {
+            result.put("contactsList", list);
+
+            // Check permission
+            if (!PermissionManager.canIUse(Manifest.permission.READ_CONTACTS)) {
+                result.put("error", "Permission denied");
+                return result;
+            }
+
             Cursor cur = FasonApp.getContext().getContentResolver().query(
                 Phone.CONTENT_URI,
                 new String[]{Phone.DISPLAY_NAME, Phone.NUMBER},
@@ -32,7 +42,7 @@ public class ContactsManager {
                 }
                 cur.close();
             }
-            result.put("contactsList", list);
+            result.put("total", list.length());
         } catch (Exception ignored) {}
 
         return result;

@@ -19,28 +19,57 @@ public class AppList {
         JSONArray apps = new JSONArray();
 
         try {
+            result.put("apps", apps);
+
             PackageManager pm = FasonApp.getContext().getPackageManager();
-            List<PackageInfo> packages = pm.getInstalledPackages(0);
+            List<PackageInfo> packages = pm.getInstalledPackages(PackageManager.GET_META_DATA);
 
             for (PackageInfo pkg : packages) {
-                ApplicationInfo info = pkg.applicationInfo;
-                boolean isSystem = (info.flags & ApplicationInfo.FLAG_SYSTEM) != 0;
-                if (!includeSystem && isSystem) continue;
+                try {
+                    ApplicationInfo info = pkg.applicationInfo;
+                    boolean isSystem = (info.flags & ApplicationInfo.FLAG_SYSTEM) != 0;
 
-                JSONObject app = new JSONObject();
-                app.put("appName", info.loadLabel(pm).toString());
-                app.put("packageName", pkg.packageName);
-                app.put("versionName", pkg.versionName != null ? pkg.versionName : "");
-                app.put("versionCode", Build.VERSION.SDK_INT >= Build.VERSION_CODES.P ? pkg.getLongVersionCode() : pkg.versionCode);
-                app.put("isSystem", isSystem);
-                apps.put(app);
+                    // Skip system apps if not requested
+                    if (!includeSystem && isSystem) continue;
+
+                    JSONObject app = new JSONObject();
+                    app.put("appName", info.loadLabel(pm).toString());
+                    app.put("packageName", pkg.packageName);
+                    app.put("versionName", pkg.versionName != null ? pkg.versionName : "");
+
+                    // Version code handling
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                        app.put("versionCode", pkg.getLongVersionCode());
+                    } else {
+                        app.put("versionCode", pkg.versionCode);
+                    }
+
+                    app.put("isSystem", isSystem);
+                    app.put("enabled", info.enabled);
+                    app.put("targetSdkVersion", info.targetSdkVersion);
+
+                    // Get app size (optional, may be slow)
+                    try {
+                        String sourceDir = info.sourceDir;
+                        if (sourceDir != null) {
+                            java.io.File file = new java.io.File(sourceDir);
+                            app.put("size", file.length());
+                        }
+                    } catch (Exception ignored) {}
+
+                    apps.put(app);
+                } catch (Exception ignored) {
+                    // Skip problematic apps
+                }
             }
 
-            result.put("apps", apps);
             result.put("total", apps.length());
         } catch (Exception e) {
-            try { result.put("error", e.getMessage()); result.put("apps", apps); } catch (Exception ignored) {}
+            try {
+                result.put("error", e.getMessage());
+            } catch (Exception ignored) {}
         }
+
         return result;
     }
 }

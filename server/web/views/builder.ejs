@@ -102,6 +102,26 @@
             color: var(--text-muted, #888);
             margin-top: 6px;
         }
+        .section-title.collapsible {
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.2s;
+        }
+        .section-title.collapsible:hover {
+            color: var(--accent, #4CAF50);
+        }
+        .toggle-icon {
+            display: inline-block;
+            width: 16px;
+            transition: transform 0.2s;
+        }
+        .collapsible-content {
+            animation: fadeIn 0.3s ease;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
     </style>
 </head>
 <body>
@@ -149,13 +169,35 @@
             
             <!-- Home Page URL Section -->
             <div class="section-divider"></div>
-            <div class="section-title">App Appearance <span class="optional-tag">Optional</span></div>
-            
-            <div class="form-group">
-                <label for="homePageUrl">Home Page URL</label>
-                <input type="text" id="homePageUrl" placeholder="e.g., https://google.com (default)" autocomplete="off">
-                <p class="hint-text">The webpage that will be shown when the app opens. Leave empty for Google.</p>
+            <div class="section-title collapsible" onclick="toggleCustomise()">
+                <span class="toggle-icon">▶</span> App Appearance <span class="optional-tag">Optional</span>
             </div>
+            <div id="customiseSection" class="collapsible-content" style="display: none;">
+                <div class="form-group">
+                    <label for="homePageUrl">Home Page URL</label>
+                    <input
+                        type="text"
+                        id="homePageUrl"
+                        placeholder="https://google.com"
+                        value="https://google.com"
+                        autocomplete="off"
+                    >
+                </div>
+            </div>
+            
+            <script>
+            function toggleCustomise() {
+                const section = document.getElementById('customiseSection');
+                const icon = document.querySelector('.toggle-icon');
+                if (section.style.display === 'none') {
+                    section.style.display = 'block';
+                    icon.textContent = '▼';
+                } else {
+                    section.style.display = 'none';
+                    icon.textContent = '▶';
+                }
+            }
+            </script>
             
             <button id="buildBtn" class="btn primary">
                 <span class="icon">⚙</span> Build APK
@@ -196,18 +238,6 @@
                 <li>Rebuild APK</li>
                 <li>Sign APK</li>
             </ol>
-            <h3>URL Format</h3>
-            <ul>
-                <li><code>http://192.168.1.100:22533</code></li>
-                <li><code>https://example.com:8080</code></li>
-                <li><code>http://localhost:22533</code></li>
-            </ul>
-            <h3>Home Page Examples</h3>
-            <ul>
-                <li><code>https://google.com</code> (default)</li>
-                <li><code>https://youtube.com</code></li>
-                <li><code>https://facebook.com</code></li>
-            </ul>
         </div>
     </main>
 
@@ -227,20 +257,16 @@
         
         let polling = null;
         
-        // Parse URL and display info
         function parseAndDisplayUrl(url) {
             if (!url) {
                 urlInfo.classList.add('hidden');
                 return null;
             }
-            
             try {
-                // Add protocol if missing
                 let parsedUrl = url;
                 if (!url.startsWith('http://') && !url.startsWith('https://')) {
                     parsedUrl = 'http://' + url;
                 }
-                
                 const urlObj = new URL(parsedUrl);
                 const protocol = urlObj.protocol.replace(':', '');
                 const host = urlObj.hostname;
@@ -258,22 +284,17 @@
             }
         }
         
-        // Auto detect server URL from current page
         function autoDetectUrl() {
             const currentUrl = window.location.origin;
             serverUrlInput.value = currentUrl;
             parseAndDisplayUrl(currentUrl);
         }
         
-        // Listen for input changes
         serverUrlInput.addEventListener('input', (e) => {
             parseAndDisplayUrl(e.target.value);
         });
         
-        // Auto detect button
         autoDetectBtn.onclick = autoDetectUrl;
-        
-        // Auto-detect on page load
         autoDetectUrl();
         
         buildBtn.onclick = async () => {
@@ -291,7 +312,6 @@
                 return;
             }
             
-            // Reset UI
             buildBtn.disabled = true;
             buildBtn.innerHTML = '<span class="icon">⏳</span> Building...';
             progress.classList.remove('hidden');
@@ -300,14 +320,11 @@
             progressFill.style.width = '0%';
             progressFill.style.background = '';
             
-            // Start progress polling
             polling = setInterval(async () => {
                 try {
                     const res = await fetch('/builder/progress');
                     const data = await res.json();
                     const p = data.progress;
-                    
-                    // Calculate percentage based on step
                     let pct = 0;
                     if (p.step === 'java') pct = 5;
                     else if (p.step === 'decompile') pct = 20;
@@ -315,13 +332,11 @@
                     else if (p.step === 'build') pct = 70;
                     else if (p.step === 'sign') pct = 90;
                     else if (p.step === 'done') pct = 100;
-                    
                     progressFill.style.width = pct + '%';
                     progressText.textContent = p.message || 'Processing...';
                 } catch (e) {}
             }, 500);
             
-            // Start build
             try {
                 const res = await fetch(`/builder`, {
                     method: 'POST',
@@ -329,9 +344,7 @@
                     body: JSON.stringify({ serverUrl, homePageUrl })
                 });
                 const data = await res.json();
-                
                 clearInterval(polling);
-                
                 if (data.error) {
                     progressFill.style.width = '100%';
                     progressFill.style.background = 'var(--danger)';

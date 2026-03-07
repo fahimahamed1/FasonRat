@@ -1,10 +1,3 @@
-/**
- * Fason - Android Remote Management Suite
- * Main entry point
- * Author: Fahim Ahamed
- * Version: 2.2.0
- */
-
 const path = require('path');
 const { spawn } = require('child_process');
 

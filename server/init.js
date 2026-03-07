@@ -7,11 +7,12 @@ const config = require('./core/config');
 const routes = require('./core/routes');
 const initSocket = require('./core/socket');
 const { logger } = require('./core/logs');
+const taskManager = require('./core/tasks');
 
 // Startup message
 console.log(`
 ╔═════════════════════════════════════════════════╗
-║              Fason Control Panel v2.2.0         ║
+║              Fason Control Panel                ║
 ║          Android Remote Administration          ║
 ╚═════════════════════════════════════════════════╝
 `);
@@ -48,6 +49,9 @@ app.use((err, req, res, next) => {
 // Initialize Socket.IO
 initSocket(server);
 
+// Start background tasks
+taskManager.startAll();
+
 // Start server
 server.listen(config.port, () => {
     console.log(`
@@ -75,6 +79,7 @@ process.on('unhandledRejection', (reason, promise) => {
 // Graceful shutdown
 process.on('SIGTERM', () => {
     logger.info('Server shutting down (SIGTERM)', 'system');
+    taskManager.stopAll();
     server.close(() => {
         logger.info('Server closed', 'system');
         process.exit(0);
@@ -83,6 +88,7 @@ process.on('SIGTERM', () => {
 
 process.on('SIGINT', () => {
     logger.info('Server shutting down (SIGINT)', 'system');
+    taskManager.stopAll();
     server.close(() => {
         logger.info('Server closed', 'system');
         process.exit(0);

