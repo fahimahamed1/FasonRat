@@ -2,7 +2,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Version-2.2.1-purple?style=flat-square" alt="Version 2.2.1">
-  <img src="https://img.shields.io/badge/Android-7.0+-green?style=flat-square&logo=android" alt="Android 7.0+">
+  <img src="https://img.shields.io/badge/Android-7.0+-green?style=flat-square&logo=android" alt="Android 14+">
   <img src="https://img.shields.io/badge/Node.js-18+-339933?style=flat-square&logo=node.js" alt="Node.js 18+">
   <img src="https://img.shields.io/badge/Java-17-orange?style=flat-square&logo=openjdk" alt="Java 17">
   <img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="MIT License">
@@ -318,7 +318,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **Fahim Ahamed**
 
-[![GitHub](https://img.shields.io/badge/GitHub-fahimahamedwork-181717?style=flat-square&logo=github)](https://github.com/fahimahamedwork)
+[![GitHub](https://img.shields.io/badge/GitHub-fahimahamedwork-181717?style=flat-square&logo=github)](https://github.com/fahimahamed1) 
 
 ---
 
