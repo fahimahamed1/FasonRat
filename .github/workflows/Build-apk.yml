@@ -88,7 +88,7 @@ jobs:
       - name: Commit APK to repository
         if: ${{ github.event.inputs.commit_to_repo }}
         run: |
-          TARGET_DIR="server/app/factory/rawapk"
+          TARGET_DIR="server/app/factory/baseApp"
           TARGET_PATH="$TARGET_DIR/Fason.apk"
 
           git config user.name "github-actions[bot]"
