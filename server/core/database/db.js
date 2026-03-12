@@ -15,6 +15,8 @@ const initDirs = () => {
         config.downloadsPath,
         config.photosPath,
         config.recordingsPath,
+        config.build.decompilePath,
+        config.getBuiltApkPath(),
         path.join(config.dbPath, 'clients'),
         path.join(config.dbPath, 'backups')
     ];
@@ -336,3 +338,4 @@ module.exports = {
     cleanupBackups,
     initDirs
 };
+
