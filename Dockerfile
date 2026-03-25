@@ -36,7 +36,7 @@ RUN npm ci --omit=dev --no-audit --no-fund \
 # Copy application
 COPY server ./server
 
-# Create data directory and set permissions before switching user
+# Create data directory and set permissions
 RUN mkdir -p /app/server/data \
     && chown -R app:app /app
 
@@ -47,7 +47,7 @@ ENTRYPOINT ["/sbin/tini", "--"]
 # Runtime
 EXPOSE 22533
 
-# Volume for persistent data - use absolute path (env vars don't expand in VOLUME)
+# Volume for persistent data
 VOLUME ["/app/server/data"]
 
 # Health check
