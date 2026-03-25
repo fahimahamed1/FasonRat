@@ -1,0 +1,32 @@
+# Docker Compose for FasonRat
+# Usage: docker-compose up -d
+
+services:
+  fasonrat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VERSION: local
+    image: fasonrat:local
+    container_name: fasonrat
+    restart: unless-stopped
+    ports:
+      - "22533:22533"
+    volumes:
+      - fasonrat-data:/app/server/data
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:22533/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+    read_only: false
+    tmpfs:
+      - /tmp
+
+volumes:
+  fasonrat-data:
+    driver: local
