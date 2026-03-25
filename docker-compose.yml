@@ -1,14 +1,9 @@
-# Docker Compose for FasonRat
+# Docker Compose for FasonRat with auto-update
 # Usage: docker-compose up -d
 
 services:
   fasonrat:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        VERSION: local
-    image: fasonrat:local
+    image: fahimahamed/fasonrat:latest
     container_name: fasonrat
     restart: unless-stopped
     ports:
@@ -23,9 +18,14 @@ services:
       start_period: 10s
     security_opt:
       - no-new-privileges:true
-    read_only: false
     tmpfs:
       - /tmp
+    # Pull latest image before starting
+    deploy:
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: start-first
 
 volumes:
   fasonrat-data:
