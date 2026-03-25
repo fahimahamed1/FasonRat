@@ -108,6 +108,9 @@ cd FasonRat
 # Install and start server
 npm install
 npm start
+
+# Start server with Docker Compose
+docker-compose up -d
 ```
 
 Access control panel at `http://localhost:22533`
