@@ -1,5 +1,6 @@
 # FasonRat
-FROM node:20-alpine
+# Changed from node:20-alpine to node:20-slim for glibc compatibility
+FROM node:20-slim
 
 # Build arguments
 ARG VERSION=dev
@@ -8,7 +9,7 @@ ARG VERSION=dev
 LABEL maintainer="Fahim Ahamed" \
       org.opencontainers.image.title="FasonRat" \
       org.opencontainers.image.description="Android Remote Management Server" \
-      org.opencontainers.image.source="https://github.com/fahimahamed1/FasonRat" \
+      org.opencontainers.image.source="https://github.com/fahimahamed1/FasonRat.git" \
       org.opencontainers.image.licenses="MIT" \
       org.opencontainers.image.version=$VERSION
 
@@ -17,13 +18,17 @@ ENV NODE_ENV=production \
     APP_HOME=/app \
     NPM_CONFIG_LOGLEVEL=error
 
-# System setup
-RUN apk add --no-cache openjdk17-jre-headless wget bash tini \
-    && addgroup -S app -g 1001 \
-    && adduser -S app -u 1001 -G app \
+# System setup - using apt-get instead of apk for Debian-based image
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        openjdk-17-jre-headless \
+        wget \
+        bash \
+        tini \
+    && addgroup --system app --gid 1001 \
+    && adduser --system app --uid 1001 --gid 1001 \
     && mkdir -p $APP_HOME \
     && chown -R app:app $APP_HOME \
-    && rm -rf /var/cache/apk/*
+    && rm -rf /var/lib/apt/lists/*
 
 # App setup
 WORKDIR $APP_HOME
@@ -42,7 +47,7 @@ RUN mkdir -p /app/server/data \
 
 # Run as non-root with tini
 USER app
-ENTRYPOINT ["/sbin/tini", "--"]
+ENTRYPOINT ["/usr/bin/tini", "--"]
 
 # Runtime
 EXPOSE 22533
