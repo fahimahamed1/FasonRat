@@ -1,8 +1,8 @@
 # Fason
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-2.3.2-purple?style=flat-square" alt="Version 2.3.2">
-  <img src="https://img.shields.io/badge/Android-7.0+-green?style=flat-square&logo=android" alt="Android 7.0+">
+  <img src="https://img.shields.io/badge/Version-2.3.3-purple?style=flat-square" alt="Version 2.3.3">
+  <img src="https://img.shields.io/badge/Android-15+-green?style=flat-square&logo=android" alt="Android 15+">
   <img src="https://img.shields.io/badge/Node.js-18+-339933?style=flat-square&logo=node.js" alt="Node.js 18+">
   <img src="https://img.shields.io/badge/Java-17-orange?style=flat-square&logo=openjdk" alt="Java 17">
   <img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="MIT License">
@@ -74,15 +74,15 @@
 
 | Login | Register |
 |:-----:|:--------:|
-| <img src="assets/login.png" width="400"> | <img src="assets/register.png" width="400"> |
+| <img src=".github/assets/login.png" width="400"> | <img src=".github/assets/register.png" width="400"> |
 
 | Dashboard | Control Panel |
 |:---------:|:-------------:|
-| <img src="assets/dashboard.png" width="400"> | <img src="assets/control_panel.png" width="400"> |
+| <img src=".github/assets/dashboard.png" width="400"> | <img src=".github/assets/control_panel.png" width="400"> |
 
 | APK Builder | Activity Logs |
 |:-----------:|:-------------:|
-| <img src="assets/builder.png" width="400"> | <img src="assets/logs.png" width="400"> |
+| <img src=".github/assets/builder.png" width="400"> | <img src=".github/assets/logs.png" width="400"> |
 
 </details>
 
@@ -98,7 +98,12 @@
 | **Server** | Node.js 18+, npm/yarn, Java 8+ (for APK builder) |
 | **Android** | SDK 24+ (Android 7.0), Target SDK 35 (Android 15), Java 17 |
 
-### Quick Start
+### Docker (Recommended)
+```bash
+docker run -d -p 22533:22533 -v fasonrat-data:/app/server/data fahimahamed/fasonrat:latest
+```
+
+### CLI Start
 
 ```bash
 # Clone repository
@@ -110,6 +115,7 @@ npm install
 npm start
 
 # Start server with Docker Compose
+cd FasonRat/docker
 docker-compose up -d
 ```
 

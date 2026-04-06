@@ -1,8 +1,0 @@
-node_modules
-.git
-.github
-Dockerfile
-README.md
-.env
-*.log
-npm-debug.log

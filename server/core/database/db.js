@@ -40,7 +40,7 @@ main.defaults({
     clients: [],
     settings: {
         serverStart: new Date().toISOString(),
-        version: '2.3.2',
+        version: '2.3.3',
         maxClients: 500
     },
     build: {

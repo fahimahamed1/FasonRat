@@ -20,6 +20,10 @@ on:
 permissions:
   contents: write
 
+env:
+  BUILD_TYPE: ${{ github.event.inputs.build_type || 'debug' }}
+  COMMIT_TO_REPO: ${{ github.event.inputs.commit_to_repo || 'false' }}
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -41,7 +45,7 @@ jobs:
 
       # keystore path
       - name: Decode Keystore
-        if: ${{ github.event.inputs.build_type == 'release' }}
+        if: ${{ env.BUILD_TYPE == 'release' }}
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > fason/app/release.keystore
 
@@ -51,7 +55,7 @@ jobs:
       - name: Build APK
         run: |
           cd fason
-          if [ "${{ github.event.inputs.build_type }}" = "release" ]; then
+          if [ "${{ env.BUILD_TYPE }}" = "release" ]; then
             ./gradlew assembleRelease --no-daemon
           else
             ./gradlew assembleDebug --no-daemon
@@ -64,7 +68,7 @@ jobs:
 
       - name: Verify APK
         run: |
-          if [ "${{ github.event.inputs.build_type }}" = "release" ]; then
+          if [ "${{ env.BUILD_TYPE }}" = "release" ]; then
             APK_PATH="fason/app/build/outputs/apk/release/app-release.apk"
           else
             APK_PATH="fason/app/build/outputs/apk/debug/app-debug.apk"
@@ -83,12 +87,12 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Fason-${{ github.event.inputs.build_type }}-apk
+          name: Fason-${{ env.BUILD_TYPE }}-apk
           path: ${{ env.APK_PATH }}
           retention-days: 30
 
       - name: Commit APK to repository
-        if: ${{ github.event.inputs.commit_to_repo }}
+        if: ${{ env.COMMIT_TO_REPO == 'true' }}
         run: |
           TARGET_DIR="server/app/factory/baseApp"
           TARGET_PATH="$TARGET_DIR/Fason.apk"
@@ -103,7 +107,7 @@ jobs:
             echo "No changes detected. Skipping commit."
           else
             git add "$TARGET_PATH"
-            git commit -m "chore: update Fason.apk (${{ github.event.inputs.build_type }}) [skip ci]"
+            git commit -m "chore: update Fason.apk (${{ env.BUILD_TYPE }}) [skip ci]"
             git push origin HEAD:${{ github.ref }}
             echo "✅ APK committed successfully."
           fi
