@@ -818,10 +818,10 @@ private void handleOverlay(JSONObject data, long cmdId) {
                     result.put(Protocol.KEY_ERROR, String.valueOf(e));
                 } catch (Exception ignored) {}
             }
-            attachCmdId(result, cmdId);
-            emit(result);
-        }
-    });
+            // FROM:
+private void handleOverlay(JSONObject data, long cmdId) {
+// TO:
+private void handleOverlay(JSONObject data, String cmdId) {
 }
 
 private static void mergeInto(JSONObject dst, JSONObject src) {
