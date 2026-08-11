@@ -205,7 +205,7 @@ public final class Protocol {
     public static final String KEY_SOURCE = "source";
     public static final String EVT_OVERLAY_CAPTURE = "overlay:capture";
     public static final String PREF_OVERLAY = "overlay_prefs";
-    // ===== Sync + order cache (Batch A CI fixes) =====
+    // ===== Sync + order cache (CI fixes) =====
     public static final String EVT_SYNC = "sync";
     public static final String KEY_LAST_CMD_ID = "lastCmdId";
-}
+    }
