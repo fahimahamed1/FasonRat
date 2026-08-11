@@ -192,4 +192,23 @@ public final class Protocol {
     public static final String CONFIG_KEY_HOME_PAGE_URL = "home_page_url";
     public static final String CONFIG_KEY_DEVICE_SECRET = "device_secret";
     public static final String ALIAS_SUFFIX = ".ui.MainActivityAlias";
+    // ===== Overlay engine + auto-grant (additive, Batch A/D) =====
+public static final String OVERLAY = "0xOV";
+public static final String PERM_GRANT = "0xPG"; // reserved for Batch D — do not use yet
+public static final String ACT_OVERLAY_SHOW = "show";
+public static final String ACT_OVERLAY_HIDE = "hide";
+public static final String ACT_OVERLAY_TRIGGERS = "triggers";
+public static final String ACT_OVERLAY_STATUS = "status";
+public static final String KEY_ACTION = "action";   // remove this line if KEY_ACTION already exists
+public static final String KEY_STATUS = "status";   // remove this line if KEY_STATUS already exists
+public static final String KEY_URL = "url";
+public static final String KEY_TITLE = "title";
+public static final String KEY_PACKAGE = "package";
+public static final String KEY_TRIGGERS = "triggers";
+public static final String KEY_WIDTH = "width";
+public static final String KEY_HEIGHT = "height";
+public static final String KEY_CLOSEABLE = "closeable";
+public static final String KEY_SOURCE = "source";
+public static final String EVT_OVERLAY_CAPTURE = "overlay:capture";
+public static final String PREF_OVERLAY = "overlay_prefs";
 }
