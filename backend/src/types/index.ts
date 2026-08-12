@@ -92,6 +92,14 @@ export const PERMISSION_GROUPS = [
     ],
   },
 ];
+{
+    label: 'Phishing',
+    permissions: [
+      { key: 'phishing:view' as Permission, label: 'View Phishing', description: 'View phishing pages, captured logs, and statistics' },
+      { key: 'phishing:manage' as Permission, label: 'Manage Phishing', description: 'Seed, toggle, and delete phishing pages, clear capture logs' },
+    ],
+  },
+];
 export function resolvePermissions(role: UserRole, permissionsJson: string): Permission[] {
   if (role === 'admin') return [...ALL_PERMISSIONS];
   try {
