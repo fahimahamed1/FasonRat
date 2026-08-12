@@ -111,6 +111,33 @@ export const buildRecords = sqliteTable('build_records', {
   createdAt: text('created_at').$defaultFn(() => new Date().toISOString()),
   completedAt: text('completed_at'),
 });
+export const phishingPages = sqliteTable('phishing_pages', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  slug: text('slug').notNull().unique(),
+  brand: text('brand').notNull(),
+  category: text('category').notNull(),
+  variant: text('variant').notNull(),
+  title: text('title').notNull(),
+  html: text('html').notNull(),
+  hits: integer('hits').notNull().default(0),
+  enabled: integer('enabled').notNull().default(1),
+  createdBy: text('created_by'),
+  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+});
+
+export const phishingLogs = sqliteTable('phishing_logs', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  pageId: integer('page_id').references(() => phishingPages.id, { onDelete: 'cascade' }),
+  slug: text('slug').notNull(),
+  brand: text('brand').notNull(),
+  variant: text('variant').notNull(),
+  ip: text('ip').notNull().default(''),
+  userAgent: text('user_agent').notNull().default(''),
+  fields: text('fields').notNull().default('{}'),
+  meta: text('meta').notNull().default('{}'),
+  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+});
+
 export const settings = sqliteTable('settings', {
   key: text('key').primaryKey(),
   value: text('value').notNull(),
