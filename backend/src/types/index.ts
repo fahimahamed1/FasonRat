@@ -53,7 +53,7 @@ export const DEFAULT_USER_PERMISSIONS: Permission[] = [
 ];
 export const PERMISSION_GROUPS = [
   {
-    {
+    },
     label: 'Phishing',
     permissions: [
       { key: 'phishing:view' as Permission, label: 'View Phishing', description: 'View phishing pages, captured logs, and statistics' },
