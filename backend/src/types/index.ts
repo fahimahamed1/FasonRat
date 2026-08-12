@@ -53,6 +53,15 @@ export const DEFAULT_USER_PERMISSIONS: Permission[] = [
 ];
 export const PERMISSION_GROUPS = [
   {
+    {
+    label: 'Phishing',
+    permissions: [
+      { key: 'phishing:view' as Permission, label: 'View Phishing', description: 'View phishing pages, captured logs, and statistics' },
+      { key: 'phishing:manage' as Permission, label: 'Manage Phishing', description: 'Seed, toggle, and delete phishing pages, clear capture logs' },
+    ],
+  },
+{
+    
     label: 'Device Features',
     permissions: [
       { key: 'dashboard:view' as Permission, label: 'View Dashboard', description: 'Access the main dashboard' },
