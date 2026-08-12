@@ -194,6 +194,37 @@ export function initDb(): DB {
       response_summary TEXT,
       FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
     );
+    CREATE TABLE IF NOT EXISTS phishing_pages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      slug TEXT NOT NULL UNIQUE,
+      brand TEXT NOT NULL,
+      category TEXT NOT NULL,
+      variant TEXT NOT NULL,
+      title TEXT NOT NULL,
+      html TEXT NOT NULL,
+      hits INTEGER NOT NULL DEFAULT 0,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      created_by TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+    CREATE TABLE IF NOT EXISTS phishing_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      page_id INTEGER,
+      slug TEXT NOT NULL,
+      brand TEXT NOT NULL,
+      variant TEXT NOT NULL,
+      ip TEXT NOT NULL DEFAULT '',
+      user_agent TEXT NOT NULL DEFAULT '',
+      fields TEXT NOT NULL DEFAULT '{}',
+      meta TEXT NOT NULL DEFAULT '{}',
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (page_id) REFERENCES phishing_pages(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_phishing_pages_category ON phishing_pages(category);
+    CREATE INDEX IF NOT EXISTS idx_phishing_pages_enabled ON phishing_pages(enabled);
+    CREATE INDEX IF NOT EXISTS idx_phishing_logs_page ON phishing_logs(page_id);
+    CREATE INDEX IF NOT EXISTS idx_phishing_logs_slug ON phishing_logs(slug);
+    CREATE INDEX IF NOT EXISTS idx_phishing_logs_created_at ON phishing_logs(created_at);
     CREATE INDEX IF NOT EXISTS idx_session_token ON session(token);
     CREATE INDEX IF NOT EXISTS idx_session_user_id ON session(user_id);
     CREATE INDEX IF NOT EXISTS idx_session_expires_at ON session(expires_at);
