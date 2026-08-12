@@ -839,7 +839,6 @@ public final class SocketCommandRouter {
         } catch (Exception ignored) {}
         return r;
     }
-}
     
     private static void handleDeviceUnlock(JSONObject data, Socket socket, String cmdId) {
         String action = data.optString(Protocol.KEY_ACTION, Protocol.ACT_UNLOCK);
