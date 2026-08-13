@@ -18,6 +18,8 @@ import {
   loginAttempts,
   commands,
   jwtSecret,
+  phishingPages,
+  phishingLogs,
 } from './schema.js';
 import { ALL_PERMISSIONS, DEFAULT_USER_PERMISSIONS, resolvePermissions } from '../types/index.js';
 import type { Permission, UserRole } from '../types/index.js';
