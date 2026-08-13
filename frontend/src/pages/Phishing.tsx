@@ -283,7 +283,7 @@ export default function PhishingPage() {
           <TabsTrigger value="logs">Capture logs ({logsTotal})</TabsTrigger>
         </TabsList>
 
-        </TabsContent> value="pages" className="space-y-4">
+        <TabsContent value="pages" className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle>Pages</CardTitle>
@@ -398,7 +398,8 @@ export default function PhishingPage() {
               </div>
             </CardContent>
           </Card>
-        <TabsContent value="logs" className="space-y-4">
+        </TabsContent>
+      <TabsContent value="logs" className="space-y-4">
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -515,4 +516,4 @@ function StatCard({ label, value }: { label: string; value: string }) {
       </CardContent>
     </Card>
   );
-      }
+}  
