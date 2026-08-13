@@ -283,7 +283,7 @@ export default function PhishingPage() {
           <TabsTrigger value="logs">Capture logs ({logsTotal})</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="pages" className="space-y-4">
+        </TabsContent> value="pages" className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle>Pages</CardTitle>
