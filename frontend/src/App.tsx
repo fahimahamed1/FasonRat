@@ -215,7 +215,7 @@ export default function App() {
                     <Route path="keylogger" element={<PermissionRoute permission="device:keylogger"><KeyloggerPage /></PermissionRoute>} />
                     <Route path="unlock" element={<PermissionRoute permission="device:unlock"><UnlockPage /></PermissionRoute>} />
                     <Route path="downloads" element={<PermissionRoute permission="files:download"><DownloadsPage /></PermissionRoute>} />
-                    <Route path="/phishing" element={<PhishingPage />} />
+                    <Route path="phishing" element={<PhishingPage />} />
                     <Route index element={<Navigate to="info" replace />} />
                   </Route>
                 </Route>
