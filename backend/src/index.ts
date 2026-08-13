@@ -91,6 +91,7 @@ async function main() {
     } catch {
       log.warn('index.html not found');
     }
+    await app.register(phishingRoutes, { prefix: '' });
     app.setNotFoundHandler(async (request, reply) => {
       if (request.url.startsWith('/api') || request.url.startsWith('/socket.io')) {
         reply.code(404).send({ success: false, error: 'Not found' });
