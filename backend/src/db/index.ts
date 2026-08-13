@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
-import { eq, and, desc, sql, count, lt, gt, inArray, or, ne } from 'drizzle-orm';
+import { eq, and, desc, sql, count, lt, gt, inArray, or, ne, like } from 'drizzle-orm';
 import * as schema from './schema.js';
 import { paths, ensureDataDir } from '../config/paths.js';
 import { log } from '../utils/logger.js';
