@@ -280,8 +280,7 @@ export default function PhishingPage() {
         <TabsList>
           <TabsTrigger value="pages">Pages ({pagesTotal})</TabsTrigger>
           <TabsTrigger value="logs">Capture logs ({logsTotal})</TabsTrigger>
-        <TabsList>
-          // @ts-ignore
+        </TabsList>
         <TabsContent value="pages" className="space-y-4">
           <Card>
             <CardHeader>
@@ -398,8 +397,7 @@ export default function PhishingPage() {
             </CardContent>
           </Card>
         </TabsContent>
-        // @ts-ignore
-      <TabsContent value="logs" className="space-y-4">
+        <TabsContent value="logs" className="space-y-4">
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
