@@ -84,8 +84,7 @@ function formatDate(value: string | null): string {
 
 export default function PhishingPage() {
   const { hasPermission } = useAuthStore();
-  const canManage = hasPermission('phishing:manage' as Permission);
-
+  const canManage = hasPermission('phishing:manage');
   // pages state
   const [pages, setPages] = useState<PhishingPageRow[]>([]);
   const [pagesTotal, setPagesTotal] = useState(0);
