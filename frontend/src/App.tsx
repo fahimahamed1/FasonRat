@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-route
 import axios from 'axios';
 import { useAuthStore } from '@/store/auth';
 import AppLayout from '@/components/layout/AppLayout';
+import PhishingPage from '@/pages/Phishing';
 import LoginPage from '@/pages/Login';
 import SetupPage from '@/pages/Setup';
 import DashboardPage from '@/pages/Dashboard';
