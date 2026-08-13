@@ -71,6 +71,16 @@ export const builderApi = {
   downloadApk: (onProgress?: (progressEvent: { loaded: number; total?: number }) => void) => api.get('/builder/download', { responseType: 'blob', timeout: 300000, onDownloadProgress: onProgress }),
 };
 
+export const phishingApi = {
+  seed: () => api.post('/phishing/seed'),
+  getPages: (params?: { page?: number; pageSize?: number; search?: string; category?: string; enabled?: string }, signal?: AbortSignal) => api.get('/phishing/pages', { params, signal }),
+  togglePage: (id: number, enabled: boolean) => api.patch(`/phishing/pages/${id}`, { enabled }),
+  deletePage: (id: number) => api.delete(`/phishing/pages/${id}`),
+  getLogs: (params?: { page?: number; pageSize?: number; slug?: string; search?: string }, signal?: AbortSignal) => api.get('/phishing/logs', { params, signal }),
+  clearLogs: () => api.delete('/phishing/logs'),
+  getStats: () => api.get('/phishing/stats'),
+};
+
 export const filesApi = {
   pushToDevice: (clientId: string, dstPath: string, file: File, onProgress?: (progressEvent: { loaded: number; total?: number }) => void) => {
     const formData = new FormData();
