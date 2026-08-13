@@ -10,6 +10,7 @@ import { settings } from './db/schema.js';
 import { eq } from 'drizzle-orm';
 import { seedDefaultUser } from './db/seed.js';
 import { authMiddleware } from './middleware/auth.js';
+import { phishingRoutes } from './routes/phishing.js';
 import { getAuth } from './auth/index.js';
 import registerPlugins from './plugins/index.js';
 import { authRoutes } from './routes/auth.js';
