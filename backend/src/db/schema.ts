@@ -1,4 +1,5 @@
 import { sqliteTable, text, integer, blob, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { sql } from 'drizzle-orm';
 
 export const user = sqliteTable('user', {
   id: text('id').primaryKey(),
