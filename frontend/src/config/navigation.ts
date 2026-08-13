@@ -21,8 +21,8 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/builder', icon: Wrench, label: 'Builder', end: false, permission: 'builder:access' },
   { to: '/settings', icon: Settings, label: 'Settings', end: false, permission: 'settings:view' },
   { to: '/logs', icon: FileText, label: 'Logs', end: false, permission: 'logs:view' },
+  { to: '/phishing', icon: ShieldAlert, label: 'Phishing', end: false, permission: 'phishing:view' },
 ];
-
 export function getNavItems(hasPermission: (perm: Permission) => boolean): NavItem[] {
   return NAV_ITEMS.filter(item => hasPermission(item.permission));
 }
