@@ -34,7 +34,7 @@ function TabsTrigger({ className, active, ...props }: React.ComponentProps<"butt
   )
 }
 
-function TabsContent({ className, ...props }: React.ComponentProps<"div">) {
+function TabsContent({ className, ...props }: React.ComponentProps<typeof TabsList>) {
   return (
     <div
       className={cn(
