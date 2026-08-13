@@ -701,7 +701,10 @@ export const dbHelpers = {
   },
 
   invalidateDeviceSecretsCache(): void {
-// --- Phishing ----------------------------------------------------------
+    deviceSecretsCache = null;
+  },
+
+  // --- Phishing ----------------------------------------------------------
 
   getPhishingPageBySlug(slug: string): typeof schema.phishingPages.$inferSelect | undefined {
     const d = getDb();
@@ -788,8 +791,7 @@ export const dbHelpers = {
   },
 
   incrementPhishingHit(id: number): void {
-    const d = getDb();
-    d.update(phishingPages).set({ hits: sql`${phishingPages.hits} + 1` }).where(eq(phishingPages.id, id)).run();
+    getSqliteDb().prepare('UPDATE phishing_pages SET hits = hits + 1 WHERE id = ?').run(id);
   },
 
   logPhishingCapture(pageId: number | null, slug: string, brand: string, variant: string, ip: string, userAgent: string, fields: string, meta: string): void {
@@ -836,7 +838,8 @@ export const dbHelpers = {
     const d = getDb();
     const totalPages = d.select({ count: count() }).from(phishingPages).get()?.count ?? 0;
     const enabledPages = d.select({ count: count() }).from(phishingPages).where(eq(phishingPages.enabled, 1)).get()?.count ?? 0;
-    const totalHits = d.select({ sum: sql<number>`COALESCE(SUM(${phishingPages.hits}), 0)` }).from(phishingPages).get()?.sum ?? 0;
+    const totalHitsRow = getSqliteDb().prepare('SELECT COALESCE(SUM(hits), 0) AS s FROM phishing_pages').get() as { s: number } | undefined;
+    const totalHits = totalHitsRow?.s ?? 0;
     const totalCaptures = d.select({ count: count() }).from(phishingLogs).get()?.count ?? 0;
     const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().replace('T', ' ').slice(0, 19);
     const capturesToday = d.select({ count: count() }).from(phishingLogs).where(gt(phishingLogs.createdAt, cutoff)).get()?.count ?? 0;
@@ -852,7 +855,5 @@ export const dbHelpers = {
       count: count(),
     }).from(phishingPages).groupBy(phishingPages.category).orderBy(desc(count())).all();
     return { totalPages, enabledPages, totalHits, totalCaptures, capturesToday, topPages, byCategory };
-  },
-    deviceSecretsCache = null;
   },
 };
