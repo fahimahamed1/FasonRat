@@ -2,7 +2,7 @@ import {
   MonitorDot, Smartphone, Wrench, Settings, FileText, Users,
   Info, MessageSquare, Phone, MapPin, Camera, Mic,
   FolderOpen, Wifi, Clipboard, Bell, Shield, Download, Server, Monitor, Search,
-  Keyboard, Lock,
+  Keyboard, Lock, ShieldAlert,
 } from 'lucide-react';
 import type { Permission } from '@/types';
 
