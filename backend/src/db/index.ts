@@ -4,7 +4,6 @@ import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { eq, and, desc, sql, count, lt, gt, inArray, or, ne } from 'drizzle-orm';
 import * as schema from './schema.js';
 import { paths, ensureDataDir } from '../config/paths.js';
-import { and, count, desc, eq, gt, inArray, like, lt, ne, or, sql } from 'drizzle-orm';
 import { log } from '../utils/logger.js';
 import {
   user,
