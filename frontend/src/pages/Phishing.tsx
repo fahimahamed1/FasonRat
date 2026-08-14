@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import {
-  ShieldAlert, Search, RefreshCw, Smartphone, Zap, Power, Plus,
-} from 'lucide-react';
+import { ShieldAlert, Search, RefreshCw, Smartphone, Plus } from 'lucide-react';
 
 /* ---------------- api helper (same origin) ---------------- */
 
@@ -41,7 +39,8 @@ interface Stats {
   captures: number; last24h: number; variants: number;
 }
 
-type Msg = { type: 'ok' | 'warn' | 'err'; text: string } | null;
+type MsgType = 'ok' | 'warn' | 'err';
+type Msg = { type: MsgType; text: string } | null;
 
 /* ---------------- brand avatar palette ---------------- */
 
@@ -80,7 +79,7 @@ export default function PhishingPage() {
   const [busyId, setBusyId] = useState<number | null>(null);
   const [msg, setMsg] = useState<Msg>(null);
 
-  const showMsg = (type: Msg['type'], text: string) => {
+  const showMsg = (type: MsgType, text: string) => {
     setMsg({ type, text });
     window.setTimeout(() => setMsg(null), 4500);
   };
@@ -97,7 +96,7 @@ export default function PhishingPage() {
   const fetchPages = useCallback(async () => {
     setLoading(true);
     try {
-      const q = new URLSearchParams({ page: String(page), pageSize: '24' });
+      const q = new URLSearchParams({ page: String(page), pageSize: '100' });
       if (search.trim()) q.set('search', search.trim());
       if (category !== 'all') q.set('category', category);
       const r = await api<{ success: boolean; data: { pages: PhishPage[]; total: number } }>(
@@ -193,7 +192,7 @@ export default function PhishingPage() {
 
   /* ---------------- render ---------------- */
 
-  const totalPages = Math.max(1, Math.ceil(total / 24));
+  const totalPages = Math.max(1, Math.ceil(total / 100));
   const selectedDevice = devices.find((d) => d.id === deviceId);
 
   return (
