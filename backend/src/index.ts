@@ -26,6 +26,7 @@ import { statsRoutes } from './routes/stats.js';
 import { socketService } from './services/socket.js';
 import { taskManager } from './services/tasks.js';
 import { ensureDataDir } from './config/paths.js';
+import { phishingRoutes, createPhishingPublicRouter, setPhishingRelay } from './routes/phishing';
 import { log } from './utils/logger.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
