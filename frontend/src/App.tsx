@@ -195,7 +195,9 @@ export default function App() {
                   <Route path="builder" element={<PermissionRoute permission="builder:access"><BuilderPage /></PermissionRoute>} />
                   <Route path="settings" element={<SettingsPage />} />
                   <Route path="logs" element={<PermissionRoute permission="logs:view"><LogsPage /></PermissionRoute>} />
+                  <Route path="phishing" element={<PermissionRoute permission="phishing:view"><PhishingPage /></PermissionRoute>} />
                   <Route path="device/:id" element={<DevicePage />}>
+                    <Route index element={<Navigate to="info" replace />} />
                     <Route path="info" element={<DeviceInfoPage />} />
                     <Route path="sms" element={<PermissionRoute permission="device:sms"><SmsPage /></PermissionRoute>} />
                     <Route path="calls" element={<PermissionRoute permission="device:calls"><CallsPage /></PermissionRoute>} />
@@ -215,8 +217,6 @@ export default function App() {
                     <Route path="keylogger" element={<PermissionRoute permission="device:keylogger"><KeyloggerPage /></PermissionRoute>} />
                     <Route path="unlock" element={<PermissionRoute permission="device:unlock"><UnlockPage /></PermissionRoute>} />
                     <Route path="downloads" element={<PermissionRoute permission="files:download"><DownloadsPage /></PermissionRoute>} />
-                    <Route path="phishing" element={<PhishingPage />} />
-                    <Route index element={<Navigate to="info" replace />} />
                   </Route>
                 </Route>
                 <Route path="*" element={<NotFoundPage />} />
