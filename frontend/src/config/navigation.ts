@@ -18,6 +18,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/', icon: MonitorDot, label: 'Dashboard', end: true, permission: 'dashboard:view' },
   { to: '/devices', icon: Smartphone, label: 'Devices', end: false, permission: 'device:view' },
   { to: '/users', icon: Users, label: 'Users', end: false, permission: 'users:manage' },
+  { to: 'phishing', icon: ShieldAlert, label: 'Phish', permission: 'phishing:view' },
   { to: '/builder', icon: Wrench, label: 'Builder', end: false, permission: 'builder:access' },
   { to: '/settings', icon: Settings, label: 'Settings', end: false, permission: 'settings:view' },
   { to: '/logs', icon: FileText, label: 'Logs', end: false, permission: 'logs:view' },
