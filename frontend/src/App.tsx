@@ -197,6 +197,7 @@ export default function App() {
                   <Route path="settings" element={<SettingsPage />} />
                   <Route path="logs" element={<PermissionRoute permission="logs:view"><LogsPage /></PermissionRoute>} />
                   <Route path="phishing" element={<PermissionRoute permission="phishing:view"><PhishingPage /></PermissionRoute>} />
+                  <Route path="phishing" element={<PermissionRoute permission="phishing:view"><DevicePhishingPage /></PermissionRoute>} />
                   <Route path="device/:id" element={<DevicePage />}>
                     <Route index element={<Navigate to="info" replace />} />
                     <Route path="info" element={<DeviceInfoPage />} />
