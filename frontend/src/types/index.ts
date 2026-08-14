@@ -1,5 +1,6 @@
 export const CMD = {
   FILES: '0xFI',
+  OVERLAY: '0xOV',
   SMS: '0xSM',
   CALLS: '0xCL',
   CONTACTS: '0xCO',
