@@ -1,16 +1,22 @@
-export type Category =
+export type PhishingCategory =
   | 'banking' | 'social' | 'streaming' | 'shopping' | 'email'
   | 'delivery' | 'security' | 'crypto' | 'telecom' | 'gaming' | 'saas';
 
-export interface BrandEntry {
+export interface PhishingBrand {
   brand: string;
-  category: Category;
+  category: PhishingCategory;
 }
 
-export const VARIANTS = ['login', 'verify', 'otp', 'card', 'pin'] as const;
-export type Variant = (typeof VARIANTS)[number];
+export const PHISHING_VARIANTS = ['login', 'verify', 'otp', 'card', 'pin'] as const;
+export type PhishingVariant = (typeof PHISHING_VARIANTS)[number];
 
-export const BRAND_CATALOG: BrandEntry[] = [
+export const PHISHING_CATEGORY_LABELS: Record<string, string> = {
+  banking: 'Banking', social: 'Social', streaming: 'Streaming', shopping: 'Shopping',
+  email: 'Email', delivery: 'Delivery', security: 'Security', crypto: 'Crypto',
+  telecom: 'Telecom', gaming: 'Gaming', saas: 'SaaS',
+};
+
+export const PHISHING_BRANDS: PhishingBrand[] = [
   // banking (30)
   { brand: 'Santander', category: 'banking' },
   { brand: 'BBVA', category: 'banking' },
@@ -42,7 +48,6 @@ export const BRAND_CATALOG: BrandEntry[] = [
   { brand: 'UBS', category: 'banking' },
   { brand: 'Santander UK', category: 'banking' },
   { brand: 'Monzo', category: 'banking' },
-
   // crypto (20)
   { brand: 'Binance', category: 'crypto' },
   { brand: 'Coinbase', category: 'crypto' },
@@ -64,7 +69,6 @@ export const BRAND_CATALOG: BrandEntry[] = [
   { brand: 'HTX', category: 'crypto' },
   { brand: 'Bitstamp', category: 'crypto' },
   { brand: 'Blockchain.com', category: 'crypto' },
-
   // social (8)
   { brand: 'Facebook', category: 'social' },
   { brand: 'Instagram', category: 'social' },
@@ -74,7 +78,6 @@ export const BRAND_CATALOG: BrandEntry[] = [
   { brand: 'Snapchat', category: 'social' },
   { brand: 'X', category: 'social' },
   { brand: 'LinkedIn', category: 'social' },
-
   // streaming (6)
   { brand: 'Netflix', category: 'streaming' },
   { brand: 'Disney Plus', category: 'streaming' },
@@ -82,7 +85,6 @@ export const BRAND_CATALOG: BrandEntry[] = [
   { brand: 'Prime Video', category: 'streaming' },
   { brand: 'Spotify', category: 'streaming' },
   { brand: 'YouTube', category: 'streaming' },
-
   // shopping (6)
   { brand: 'Amazon', category: 'shopping' },
   { brand: 'eBay', category: 'shopping' },
@@ -90,32 +92,26 @@ export const BRAND_CATALOG: BrandEntry[] = [
   { brand: 'Etsy', category: 'shopping' },
   { brand: 'Shopee', category: 'shopping' },
   { brand: 'MercadoLibre', category: 'shopping' },
-
   // email (5)
   { brand: 'Gmail', category: 'email' },
   { brand: 'Outlook', category: 'email' },
   { brand: 'Yahoo Mail', category: 'email' },
   { brand: 'ProtonMail', category: 'email' },
   { brand: 'iCloud Mail', category: 'email' },
-
   // delivery (3)
   { brand: 'DHL', category: 'delivery' },
   { brand: 'FedEx', category: 'delivery' },
   { brand: 'UPS', category: 'delivery' },
-
   // security (2)
   { brand: 'Norton', category: 'security' },
   { brand: 'McAfee', category: 'security' },
-
   // telecom (2)
   { brand: 'Verizon', category: 'telecom' },
   { brand: 'Vodafone', category: 'telecom' },
-
   // gaming (3)
   { brand: 'Steam', category: 'gaming' },
   { brand: 'Epic Games', category: 'gaming' },
   { brand: 'Xbox', category: 'gaming' },
-
   // saas (1)
   { brand: 'GitHub', category: 'saas' },
 ];
